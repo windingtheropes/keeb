@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 // keep in note leds are not mapped and probably won't ever be since I do not use rgb on my keyboard.
 // this is a simple representation of how I can contact my computer with my keyboard and do some hid tasks
 // this coul;d be used for more advanced macros and all presses are sent here, unreliability aside from reading keypresses from the os
@@ -237,9 +235,11 @@ fn main() {
                 // key released
                 let key_code = payload[1];
                 let led_code = GmmkProLed::key_to_led(StandardKeys::get_key(key_code).unwrap());
+                
                 if key_code == StandardKeys::RollOver as u8 {
                     set_color(led_code.unwrap(), 255, 0, 0);
                 } else {
+                    
                 }
             }
             _ => {}
