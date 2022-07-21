@@ -1,213 +1,248 @@
+#![allow(dead_code)]
+
 // keep in note leds are not mapped and probably won't ever be since I do not use rgb on my keyboard.
 // this is a simple representation of how I can contact my computer with my keyboard and do some hid tasks
 // this coul;d be used for more advanced macros and all presses are sent here, unreliability aside from reading keypresses from the os
 const VENDOR_ID: u16 = 0x320F;
 const PRODUCT_ID: u16 = 0x5044;
-use std::{thread, time::Duration};
+use std::thread;
+use std::time::{Duration, SystemTime};
 
-enum LED {
-    LedEsc = 0,     //0,Esc,K13
-    LedGrv = 1,     //1,~,K16
-    LedTab = 2,     //2,Tab,K11
-    LedCaps = 3,   //3,Caps,K21
-    LedLsft = 4,   //4,Sh_l,K00
-    LedLctl = 5,   //5,Ct_l,K06
-    LedF1 = 6,     //6,F1,K26
-    Led1 = 7,      //7,1,K17
-    LedQ = 8,      //8,Q,K10
-    LedA = 9,      //9,A,K12
-    LedZ = 10,     //10,Z,K14
-    LedLwin = 11,  //11,Win_l,K90
-    LedF2 = 12,    //12,F2,K36
-    Led2 = 13,     //13,2,K27
-    LedW = 14,     //14,W,K20
-    LedS = 15,     //15,S,K22
-    LedX = 16,     //16,X,K24
-    LedLalt = 17,  //17,Alt_l,K93
-    LedF3 = 18,    //18,F3,K31
-    Led3 = 19,     //19,3,K37
-    LedE = 20,     //20,E,K30
-    LedD = 21,     //21,D,K32
-    LedC = 22,     //22,C,K34
-    LedF4 = 23,    //23,F4,K33
-    Led4 = 24,     //24,4,K47
-    LedR = 25,     //25,R,K40
-    LedF = 26,     //26,F,K42
-    LedV = 27,     //27,V,K44
-    LedF5 = 28,    //28,F5,K07
-    Led5 = 29,     //29,5,K46
-    LedT = 30,     //30,T,K41
-    LedG = 31,     //31,G,K43
-    LedB = 32,     //32,B,K45
-    LedSpc = 33,   //33,Space,K94
-    LedF6 = 34,    //34,F6,K63
-    Led6 = 35,     //35,6,K56
-    LedY = 36,     //36,Y,K51
-    LedH = 37,     //37,H,K53
-    LedN = 38,     //38,N,K55
-    LedF7 = 39,    //39,F7,K71
-    Led7 = 40,     //40,7,K57
-    LedU = 41,     //41,U,K50
-    LedJ = 42,     //42,J,K52
-    LedM = 43,     //43,M,K54
-    LedF8 = 44,    //44,F8,K76
-    Led8 = 45,     //45,8,K67
-    LedI = 46,     //46,I,K60
-    LedK = 47,     //47,K,K62
-    LedComm = 48,  //48,,,K64
-    LedRalt = 49,  //49,Alt_r,K95
-    LedF9 = 50,    //50,F9,Ka6
-    Led9 = 51,     //51,9,K77
-    LedO = 52,     //52,O,K70
-    LedL = 53,     //53,L,K72
-    LedDot = 54,   //54,.,K74
-    LedFn = 55,    //55,Fn,K92
-    LedF10 = 56,   //56,F10,Ka7
-    Led0 = 57,     //57,0,K87
-    LedP = 58,     //58,P,K80
-    LedScln = 59,  //59,;,K82
-    LedSlsh = 60,  //60,?,K85
-    LedF11 = 61,   //61,F11,Ka3
-    LedMins = 62,  //62,-,K86
-    LedLbrc = 63,  //63,[,K81
-    LedQuot = 64,  //64,",K83
-    LedRctl = 65,  //65,Ct_r,K04
-    LedF12 = 66,   //66,F12,Ka5
-    LedL1 = 67,    //67,Led,L01
-    LedR1 = 68,    //68,Led,L11
-    LedPrt = 69,   //69,Prt,K97
-    LedL2 = 70,    //70,Led,L02
-    LedR2 = 71,    //71,Led,L12
-    LedDel = 72,   //72,Del,K65
-    LedL3 = 73,    //73,Led,L03
-    LedR3 = 74,    //74,Led,L13
-    LedPgup = 75,  //75,Pgup,K15
-    LedL4 = 76,    //76,Led,L04
-    LedR4 = 77,    //77,Led,L14
-    LedEql = 78,   //78,=,K66
-    LedRight = 79, //79,Right,K05
-    LedL5 = 80,    //80,Led,L05
-    LedR5 = 81,    //81,Led,L15
-    LedEnd = 82,   //82,End,K75
-    LedL6 = 83,    //83,Led,L06
-    LedR6 = 84,    //84,Led,L16
-    LedBspc = 85,  //85,Bspc,Ka1
-    LedPgdn = 86,  //86,Pgdn,K25
-    LedL7 = 87,    //87,Led,L07
-    LedR7 = 88,    //88,Led,L17
-    LedRbrc = 89,  //89,],K61
-    LedRsft = 90,  //90,Sh_r,K91
-    LedL8 = 91,    //91,Led,L08
-    LedR8 = 92,    //92,Led,L18
-    LedBsls = 93,  //93,\,Ka2
-    LedUp = 94,    //94,Up,K35
-    LedLeft = 95,  //95,Left,K03
-    LedEnt = 96,   //96,Enter,Ka4
-    LedDown = 97,  //97,Down,K73
-}
-
-fn key_to_led(key:u8) -> u8{ // this will never be completed and it was purely for testing purposes.
-    match key{
-        41 => 0,
-        53 => 1,
-        43 => 2, 
-        57 => 3,
-        225 => 4, 
-        224 => 5,
-        58 => 6, 
-        30 => 7,
-        20 => 8,
-        4 => 9,
-        29 => 10,
-        227 => 11,
-        59 => 12,
-        31 => 13,
-        26 => 14,
-        22 => 15,
-        27 => 16,
-        226 => 17,
-        60 => 18,
-        32 => 19,
-        8 => 20,
-        7 => 21,
-        6 => 22,
-        61 => 23,
-        33 => 24,
-        21 => 25,
-        9 => 26,
-        25 => 27,
-        62 => 28,
-        34 => 29,
-        23 => 30,
-        10 => 31,
-        5 => 32,
-        44 => 33,
-        63 => 34,
-        35 => 35,
-        28 => 36,
-        11 => 37,
-        17 => 38,
-        64 => 39,
-        _ => 0,
-    }
-}
+mod keycodes;
 
 use hidapi::HidDevice;
+use keycodes::codes::*;
 
-fn set_color_all(r: u8, g: u8, b: u8, device: &HidDevice) {
-    let buf = [0x1, 2, r, g, b];
-    device.write(&buf).unwrap();
+fn char_to_keycode(s: String) -> Vec<u8> {
+    let s = s.as_str();
+    let res: Vec<u8> = match s {
+        // Lower Alphabet
+        "a" => vec![StandardKeys::A as u8],
+        "b" => vec![StandardKeys::B as u8],
+        "c" => vec![StandardKeys::C as u8],
+        "d" => vec![StandardKeys::D as u8],
+        "e" => vec![StandardKeys::E as u8],
+        "f" => vec![StandardKeys::F as u8],
+        "g" => vec![StandardKeys::G as u8],
+        "h" => vec![StandardKeys::H as u8],
+        "i" => vec![StandardKeys::I as u8],
+        "j" => vec![StandardKeys::J as u8],
+        "k" => vec![StandardKeys::K as u8],
+        "l" => vec![StandardKeys::L as u8],
+        "m" => vec![StandardKeys::M as u8],
+        "n" => vec![StandardKeys::N as u8],
+        "o" => vec![StandardKeys::O as u8],
+        "p" => vec![StandardKeys::P as u8],
+        "q" => vec![StandardKeys::Q as u8],
+        "r" => vec![StandardKeys::R as u8],
+        "s" => vec![StandardKeys::S as u8],
+        "t" => vec![StandardKeys::T as u8],
+        "u" => vec![StandardKeys::U as u8],
+        "v" => vec![StandardKeys::V as u8],
+        "w" => vec![StandardKeys::W as u8],
+        "x" => vec![StandardKeys::X as u8],
+        "y" => vec![StandardKeys::Y as u8],
+        "z" => vec![StandardKeys::Z as u8],
+        // Upper Alphabet
+        "A" => vec![StandardKeys::LeftShift as u8, StandardKeys::A as u8],
+        "B" => vec![StandardKeys::LeftShift as u8, StandardKeys::B as u8],
+        "C" => vec![StandardKeys::LeftShift as u8, StandardKeys::C as u8],
+        "D" => vec![StandardKeys::LeftShift as u8, StandardKeys::D as u8],
+        "E" => vec![StandardKeys::LeftShift as u8, StandardKeys::E as u8],
+        "F" => vec![StandardKeys::LeftShift as u8, StandardKeys::F as u8],
+        "G" => vec![StandardKeys::LeftShift as u8, StandardKeys::G as u8],
+        "H" => vec![StandardKeys::LeftShift as u8, StandardKeys::H as u8],
+        "I" => vec![StandardKeys::LeftShift as u8, StandardKeys::I as u8],
+        "J" => vec![StandardKeys::LeftShift as u8, StandardKeys::J as u8],
+        "K" => vec![StandardKeys::LeftShift as u8, StandardKeys::K as u8],
+        "L" => vec![StandardKeys::LeftShift as u8, StandardKeys::L as u8],
+        "M" => vec![StandardKeys::LeftShift as u8, StandardKeys::M as u8],
+        "N" => vec![StandardKeys::LeftShift as u8, StandardKeys::N as u8],
+        "O" => vec![StandardKeys::LeftShift as u8, StandardKeys::O as u8],
+        "P" => vec![StandardKeys::LeftShift as u8, StandardKeys::P as u8],
+        "Q" => vec![StandardKeys::LeftShift as u8, StandardKeys::Q as u8],
+        "R" => vec![StandardKeys::LeftShift as u8, StandardKeys::R as u8],
+        "S" => vec![StandardKeys::LeftShift as u8, StandardKeys::S as u8],
+        "T" => vec![StandardKeys::LeftShift as u8, StandardKeys::T as u8],
+        "U" => vec![StandardKeys::LeftShift as u8, StandardKeys::U as u8],
+        "V" => vec![StandardKeys::LeftShift as u8, StandardKeys::V as u8],
+        "W" => vec![StandardKeys::LeftShift as u8, StandardKeys::W as u8],
+        "X" => vec![StandardKeys::LeftShift as u8, StandardKeys::X as u8],
+        "Y" => vec![StandardKeys::LeftShift as u8, StandardKeys::Y as u8],
+        "Z" => vec![StandardKeys::LeftShift as u8, StandardKeys::Z as u8],
+        // Number row
+        "1" => vec![StandardKeys::Num1 as u8],
+        "2" => vec![StandardKeys::Num2 as u8],
+        "3" => vec![StandardKeys::Num3 as u8],
+        "4" => vec![StandardKeys::Num4 as u8],
+        "5" => vec![StandardKeys::Num5 as u8],
+        "6" => vec![StandardKeys::Num6 as u8],
+        "7" => vec![StandardKeys::Num7 as u8],
+        "8" => vec![StandardKeys::Num8 as u8],
+        "9" => vec![StandardKeys::Num9 as u8],
+        "0" => vec![StandardKeys::Num0 as u8],
+        // Number row symbols
+        "!" => vec![StandardKeys::LeftShift as u8, StandardKeys::Num1 as u8],
+        "@" => vec![StandardKeys::LeftShift as u8, StandardKeys::Num2 as u8],
+        "#" => vec![StandardKeys::LeftShift as u8, StandardKeys::Num3 as u8],
+        "$" => vec![StandardKeys::LeftShift as u8, StandardKeys::Num4 as u8],
+        "%" => vec![StandardKeys::LeftShift as u8, StandardKeys::Num5 as u8],
+        "^" => vec![StandardKeys::LeftShift as u8, StandardKeys::Num6 as u8],
+        "&" => vec![StandardKeys::LeftShift as u8, StandardKeys::Num7 as u8],
+        "*" => vec![StandardKeys::LeftShift as u8, StandardKeys::Num8 as u8],
+        "(" => vec![StandardKeys::LeftShift as u8, StandardKeys::Num9 as u8],
+        ")" => vec![StandardKeys::LeftShift as u8, StandardKeys::Num0 as u8],
+        // Other characters
+        "`" => vec![StandardKeys::Grave as u8],
+        "," => vec![StandardKeys::Comma as u8],
+        "." => vec![StandardKeys::Dot as u8],
+        "/" => vec![StandardKeys::Slash as u8],
+        "\'" => vec![StandardKeys::Quote as u8],
+        ";" => vec![StandardKeys::Semicolon as u8],
+        "\\" => vec![StandardKeys::Backslash as u8],
+        "[" => vec![StandardKeys::LeftBracket as u8],
+        "]" => vec![StandardKeys::RightBracket as u8],
+        "=" => vec![StandardKeys::Equal as u8],
+        "-" => vec![StandardKeys::Minus as u8],
+        // Other characters shifted
+        "~" => vec![StandardKeys::LeftShift as u8, StandardKeys::Grave as u8],
+        "<" => vec![StandardKeys::LeftShift as u8, StandardKeys::Comma as u8],
+        ">" => vec![StandardKeys::LeftShift as u8, StandardKeys::Dot as u8],
+        "?" => vec![StandardKeys::LeftShift as u8, StandardKeys::Slash as u8],
+        "\"" => vec![StandardKeys::LeftShift as u8, StandardKeys::Quote as u8],
+        ":" => vec![StandardKeys::LeftShift as u8, StandardKeys::Semicolon as u8],
+        "|" => vec![StandardKeys::LeftShift as u8, StandardKeys::Backslash as u8],
+        "{" => vec![
+            StandardKeys::LeftShift as u8,
+            StandardKeys::LeftBracket as u8,
+        ],
+        "}" => vec![
+            StandardKeys::LeftShift as u8,
+            StandardKeys::RightBracket as u8,
+        ],
+        "+" => vec![StandardKeys::LeftShift as u8, StandardKeys::Equal as u8],
+        "_" => vec![StandardKeys::LeftShift as u8, StandardKeys::Minus as u8],
+        // "*" => vec![StandardKeys::KpAsterisk as u8],
+        " " => vec![StandardKeys::Space as u8],
+        // Otherwise it's 0
+        _ => vec![StandardKeys::No as u8],
+    };
+    res
 }
 
-fn set_color(led: u8, r: u8, g: u8, b: u8, device: &HidDevice) {
-    let buf = [0x1, 1, led, r, g, b];
-    device.write(&buf).unwrap();
+fn keycode_as_int<T: EnumInt>(e: T) -> u8 {
+    e.as_int()
 }
 
-fn blink_key(led: u8, device: &HidDevice)
-{
-    let interval = 255 / 12;
-    let mut curr = 255;
-    set_color(led, 255, 255, 255, &device);
-    for i in 0..12 {
-        curr -= interval;
-        set_color(led, curr, curr, curr, &device);
-        thread::sleep(Duration::from_micros(1200))
+fn string_to_keycode(s: String) -> Vec<Vec<u8>> {
+    let char_vec: Vec<char> = s.chars().collect();
+    let mut chars: Vec<Vec<u8>> = vec![];
+    for c in char_vec {
+        chars.push(char_to_keycode(c.to_string()));
     }
-    set_color(led, 0, 0, 0, &device);
+    chars
 }
 fn main() {
     let api = hidapi::HidApi::new().unwrap();
     let device = api.open(VENDOR_ID, PRODUCT_ID).unwrap();
 
-    blink_key(45, &device);
+    let set_color = |led: u8, r: u8, g: u8, b: u8| {
+        let buf = [0x1, 1, led, r, g, b];
+        device.write(&buf).unwrap();
+    };
 
-    // Write data to device
+    let set_color_all = |r: u8, g: u8, b: u8| {
+        let buf = [0x1, 2, r, g, b];
+        device.write(&buf).unwrap();
+    };
+
+    let set_color_side = |side: u8, r: u8, g: u8, b: u8| {
+        let buf = [0x1, 3, side, r, g, b];
+        device.write(&buf).unwrap();
+    };
+
+    let tap_code = |kc: u8| {
+        let buf = [0x1, 4, kc];
+        device.write(&buf).unwrap();
+    };
+
+    let reg_key = |kc: u8| {
+        let buf = [0x1, 5, 1, kc];
+        device.write(&buf).unwrap();
+    };
+
+    let unreg_key = |kc: u8| {
+        let buf = [0x1, 5, 0, kc];
+        device.write(&buf).unwrap();
+    };
+
+    let type_string = |s: String| {
+        let codes = string_to_keycode(s);
+        for i in codes {
+            for u in &i {
+                reg_key(u.to_owned());
+            }
+            for u in &i {
+                unreg_key(u.to_owned());
+            }
+        }
+    };
+    // let blink_key = |led: u8, r:u8, g:u8, b:u8, ms: u64| {
+    //     thread::spawn(|| {
+    //         set_color(led, r, g, b);
+    //         thread::sleep(Duration::from_millis(ms));
+    //         set_color(led, 0, 0, 0);
+    //     })
+    // };
+
+    // Writing data to the device
+    // ********
+    // let buf = [0x1, 1, 0];
+    // device.write(&buf).unwrap();
+    // ********
     // the length of the payload must always be one more byte than the length of the actual desired readable payload, by preceeding it with a 0x1 byte
-    // 1: simple single
-    // 2: simple all
+    // an example payload
+    // [1, 1, 255, 255, 255]
+    // [method, param, param, param, param, etc]
+    // methods
+    // 1: single rgb | [1, 45, 255, 255, 255] turns key 45 to white
+    // 2: all rgb | [2, 255, 255, 255] turns the entire keyboard lighting to white
+    // 3: side rgb | [3, 0, 255, 255, 255] 0 = left, 1 = right, this turns the left side to white
+    // 4: high level key manipulation; key tap | [4, 0] taps keycode 0
+    // 5: low level key manipulation; key register/unregister | [5, 1, 0] registers keycode 1. input registered until unregistered.
 
-    // writing data
-    // the payload must be one longer than the desired readable result is, by 0x1 at front, which will not show.
-    // set_color_all(255, 255, 255, &device);
-    // thread::sleep(Duration::from_millis(4000));
-    // set_color_all(0, 0, 0, &device);
-
-    // set_color(led_location_map::LED_ESC as u8, 255, 255, 255, &device);
-    // thread::sleep(Duration::from_secs(1));
-    // set_color(led_location_map::LED_ESC as u8, 0, 0, 0, &device);
-
-    // reading data
-    // u8 is the value type and 2 is the length
-    // loop {
-    //     let mut buf = [0u8; 2];
-    //     let res = device.read(&mut buf[..]).unwrap();
-    //     println!("Read: {:?}", &buf[..res]);
-    //     let r = &buf[..res];
-    //     blink_key(key_to_led(r[1]), &device);
-    // }
-    // reading
+    // Reading data from the device
+    // ********
     // let mut buf = [0u8; 2];
     // let res = device.read(&mut buf[..]).unwrap();
-    // println!("Read: {:?}", &buf[..res]);
+    // let payload = &buf[..res];
+    // ********
+    // payload structure is the same, except separated into types and data instead of methods
+    // [1, 100]
+    // [type, param]
+    // types
+    // 1: key pressed | [1, 45] key 45 was pressed down
+    // 2: key released | [1, 45] key 45 was released. this is the most common area to key key input.
+    // 3: rotary encoder turned | [1, 1] the rotary encoder was turned clockwise
+
+    loop {
+        let mut buf = [0u8; 2];
+        let res = device.read(&mut buf[..]).unwrap();
+        let payload = &buf[..res];
+        match payload[0] {
+            1 => {
+                // key pressed
+            }
+            2 => {
+                // key released
+                let key_code = payload[1];
+                let led_code = GmmkProLed::key_to_led(StandardKeys::get_key(key_code).unwrap());
+                if key_code == StandardKeys::RollOver as u8 {
+                    set_color(led_code.unwrap(), 255, 0, 0);
+                } else {
+                }
+            }
+            _ => {}
+        }
+    }
 }
