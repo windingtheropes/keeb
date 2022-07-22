@@ -1,10 +1,44 @@
 // keep in note leds are not mapped and probably won't ever be since I do not use rgb on my keyboard.
 // this is a simple representation of how I can contact my computer with my keyboard and do some hid tasks
 // this coul;d be used for more advanced macros and all presses are sent here, unreliability aside from reading keypresses from the os
+
+// Writing data to the device
+    // ********
+    // let buf = [0x1, 1, 0];
+    // device.write(&buf).unwrap();
+    // ********
+    // the length of the payload must always be one more byte than the length of the actual desired readable payload, by preceeding it with a 0x1 byte
+    // an example payload
+    // [1, 1, 255, 255, 255]
+    // [method, param, param, param, param, etc]
+    // methods
+    // 1: single rgb | [1, 45, 255, 255, 255] turns key 45 to white
+    // 2: all rgb | [2, 255, 255, 255] turns the entire keyboard lighting to white
+    // 3: side rgb | [3, 0, 255, 255, 255] 0 = left, 1 = right, this turns the left side to white
+    // 4: high level key manipulation; key tap | [4, 0] taps keycode 0
+    // 5: low level key manipulation; key register/unregister | [5, 1, 0] registers keycode 1. input registered until unregistered.
+    // 6: intercept mode: will disable sending keypresses to the operating system, to be intercepted by this program; turn on/off | [6, 1] turns on intercept mode
+
+    // Reading data from the device
+    // ********
+    // let mut buf = [0u8; 2];
+    // let res = device.read(&mut buf[..]).unwrap();
+    // let payload = &buf[..res];
+    // ********
+    // payload structure is the same, except separated into types and data instead of methods
+    // [1, 100]
+    // [type, param]
+    // types
+    // 1: key pressed | [1, 45] key 45 was pressed down
+    // 2: key released | [1, 45] key 45 was released. this is the most common area to key key input.
+    // 3: rotary encoder turned | [1, 1] the rotary encoder was turned clockwise
+
 const VENDOR_ID: u16 = 0x320F;
 const PRODUCT_ID: u16 = 0x5044;
+use std::ops::Add;
 use std::thread;
 use std::time::{Duration, SystemTime};
+use std::sync::mpsc::{sync_channel, Receiver};
 
 mod keycodes;
 
@@ -174,6 +208,11 @@ fn main() {
         device.write(&buf).unwrap();
     };
 
+    let intercept_mode = |on: u8| {
+        let buf = [0x1, 6, on];
+        device.write(&buf).unwrap();
+    };
+
     let type_string = |s: String| {
         let codes = string_to_keycode(s);
         for i in codes {
@@ -185,64 +224,71 @@ fn main() {
             }
         }
     };
-    // let blink_key = |led: u8, r:u8, g:u8, b:u8, ms: u64| {
-    //     thread::spawn(|| {
-    //         set_color(led, r, g, b);
-    //         thread::sleep(Duration::from_millis(ms));
-    //         set_color(led, 0, 0, 0);
-    //     })
-    // };
 
-    // Writing data to the device
-    // ********
-    // let buf = [0x1, 1, 0];
-    // device.write(&buf).unwrap();
-    // ********
-    // the length of the payload must always be one more byte than the length of the actual desired readable payload, by preceeding it with a 0x1 byte
-    // an example payload
-    // [1, 1, 255, 255, 255]
-    // [method, param, param, param, param, etc]
-    // methods
-    // 1: single rgb | [1, 45, 255, 255, 255] turns key 45 to white
-    // 2: all rgb | [2, 255, 255, 255] turns the entire keyboard lighting to white
-    // 3: side rgb | [3, 0, 255, 255, 255] 0 = left, 1 = right, this turns the left side to white
-    // 4: high level key manipulation; key tap | [4, 0] taps keycode 0
-    // 5: low level key manipulation; key register/unregister | [5, 1, 0] registers keycode 1. input registered until unregistered.
+    let intercepts = |kc: u8, e: u8| {
+        if kc == StandardKeys::Escape as u8
+        {   
+            if e == 0 {
+                intercept_mode(1);
+                reg_key(StandardKeys::A as u8);
+            } else {
+                intercept_mode(0);
+                unreg_key(StandardKeys::A as u8);
+            }
+        }
+    };
 
-    // Reading data from the device
-    // ********
-    // let mut buf = [0u8; 2];
-    // let res = device.read(&mut buf[..]).unwrap();
-    // let payload = &buf[..res];
-    // ********
-    // payload structure is the same, except separated into types and data instead of methods
-    // [1, 100]
-    // [type, param]
-    // types
-    // 1: key pressed | [1, 45] key 45 was pressed down
-    // 2: key released | [1, 45] key 45 was released. this is the most common area to key key input.
-    // 3: rotary encoder turned | [1, 1] the rotary encoder was turned clockwise
+    // events
+    let on_key_down = |kc: u8| {
+        intercepts(kc, 0);
+    };
 
-    loop {
-        let mut buf = [0u8; 2];
-        let res = device.read(&mut buf[..]).unwrap();
-        let payload = &buf[..res];
+    let on_key_up = |kc: u8| {
+        intercepts(kc, 1);
+    };
+
+    let on_knob_turned = |cw:bool|{
+        match cw {
+            true => tap_code(MouseKeys::MsWhDown as u8),
+            false => tap_code(MouseKeys::MsWhUp as u8),
+        }
+    };
+
+    let on_keyboard_event = |payload: &[u8]| {
         match payload[0] {
             1 => {
                 // key pressed
+                let key_code = payload[1];
+                on_key_down(key_code);
             }
             2 => {
                 // key released
                 let key_code = payload[1];
-                let led_code = GmmkProLed::key_to_led(StandardKeys::get_key(key_code).unwrap());
-                
-                if key_code == StandardKeys::RollOver as u8 {
-                    set_color(led_code.unwrap(), 255, 0, 0);
-                } else {
-                    
-                }
+                on_key_up(key_code);
+            }
+            3 => {
+                // rotary 
+                let cw = payload[1] == 1;
+                on_knob_turned(cw);
             }
             _ => {}
         }
+    };
+
+    let mut color:u8 = 0;
+    // input loop
+    loop {
+        // receiver configuration
+        let mut buf = [0u8; 2];
+        let res = device.read(&mut buf[..]).unwrap();
+        // received data from the keyboard
+        let payload = &buf[..res];
+        
+        // parse the payload
+        if payload[0] != 0 {
+            // this means there was some kind of event
+            on_keyboard_event(payload);
+        }
+        // thread::sleep(Duration::from_millis(1));
     }
 }
