@@ -18,6 +18,7 @@
     // 4: high level key manipulation; key tap | [4, 0] taps keycode 0
     // 5: low level key manipulation; key register/unregister | [5, 1, 0] registers keycode 1. input registered until unregistered.
     // 6: intercept mode: will disable sending keypresses to the operating system, to be intercepted by this program; turn on/off | [6, 1] turns on intercept mode
+    // 7: conditional single led | [7, 1, 255, 255, 255] turns key 1 to white if it was previously off,  or turns key 1 to off if it was on.
 
     // Reading data from the device
     // ********
@@ -35,129 +36,125 @@
 
 const VENDOR_ID: u16 = 0x320F;
 const PRODUCT_ID: u16 = 0x5044;
-use std::ops::Add;
-use std::thread;
-use std::time::{Duration, SystemTime};
-use std::sync::mpsc::{sync_channel, Receiver};
 
-mod keycodes;
-
-use hidapi::HidDevice;
-use keycodes::codes::*;
+use hidapi;
+use keebLib::codes::Keys::*;
+use keebLib::codes::EnumInt;
+use gmmk::pro::Leds::*;
 
 fn char_to_keycode(s: String) -> Vec<u8> {
     let s = s.as_str();
     let res: Vec<u8> = match s {
         // Lower Alphabet
-        "a" => vec![StandardKeys::A as u8],
-        "b" => vec![StandardKeys::B as u8],
-        "c" => vec![StandardKeys::C as u8],
-        "d" => vec![StandardKeys::D as u8],
-        "e" => vec![StandardKeys::E as u8],
-        "f" => vec![StandardKeys::F as u8],
-        "g" => vec![StandardKeys::G as u8],
-        "h" => vec![StandardKeys::H as u8],
-        "i" => vec![StandardKeys::I as u8],
-        "j" => vec![StandardKeys::J as u8],
-        "k" => vec![StandardKeys::K as u8],
-        "l" => vec![StandardKeys::L as u8],
-        "m" => vec![StandardKeys::M as u8],
-        "n" => vec![StandardKeys::N as u8],
-        "o" => vec![StandardKeys::O as u8],
-        "p" => vec![StandardKeys::P as u8],
-        "q" => vec![StandardKeys::Q as u8],
-        "r" => vec![StandardKeys::R as u8],
-        "s" => vec![StandardKeys::S as u8],
-        "t" => vec![StandardKeys::T as u8],
-        "u" => vec![StandardKeys::U as u8],
-        "v" => vec![StandardKeys::V as u8],
-        "w" => vec![StandardKeys::W as u8],
-        "x" => vec![StandardKeys::X as u8],
-        "y" => vec![StandardKeys::Y as u8],
-        "z" => vec![StandardKeys::Z as u8],
+        "a" => vec![KC_A as u8],
+        "b" => vec![KC_B as u8],
+        "c" => vec![KC_C as u8],
+        "d" => vec![KC_D as u8],
+        "e" => vec![KC_E as u8],
+        "f" => vec![KC_F as u8],
+        "g" => vec![KC_G as u8],
+        "h" => vec![KC_H as u8],
+        "i" => vec![KC_I as u8],
+        "j" => vec![KC_J as u8],
+        "k" => vec![KC_K as u8],
+        "l" => vec![KC_L as u8],
+        "m" => vec![KC_M as u8],
+        "n" => vec![KC_N as u8],
+        "o" => vec![KC_O as u8],
+        "p" => vec![KC_P as u8],
+        "q" => vec![KC_Q as u8],
+        "r" => vec![KC_R as u8],
+        "s" => vec![KC_S as u8],
+        "t" => vec![KC_T as u8],
+        "u" => vec![KC_U as u8],
+        "v" => vec![KC_V as u8],
+        "w" => vec![KC_W as u8],
+        "x" => vec![KC_X as u8],
+        "y" => vec![KC_Y as u8],
+        "z" => vec![KC_Z as u8],
         // Upper Alphabet
-        "A" => vec![StandardKeys::LeftShift as u8, StandardKeys::A as u8],
-        "B" => vec![StandardKeys::LeftShift as u8, StandardKeys::B as u8],
-        "C" => vec![StandardKeys::LeftShift as u8, StandardKeys::C as u8],
-        "D" => vec![StandardKeys::LeftShift as u8, StandardKeys::D as u8],
-        "E" => vec![StandardKeys::LeftShift as u8, StandardKeys::E as u8],
-        "F" => vec![StandardKeys::LeftShift as u8, StandardKeys::F as u8],
-        "G" => vec![StandardKeys::LeftShift as u8, StandardKeys::G as u8],
-        "H" => vec![StandardKeys::LeftShift as u8, StandardKeys::H as u8],
-        "I" => vec![StandardKeys::LeftShift as u8, StandardKeys::I as u8],
-        "J" => vec![StandardKeys::LeftShift as u8, StandardKeys::J as u8],
-        "K" => vec![StandardKeys::LeftShift as u8, StandardKeys::K as u8],
-        "L" => vec![StandardKeys::LeftShift as u8, StandardKeys::L as u8],
-        "M" => vec![StandardKeys::LeftShift as u8, StandardKeys::M as u8],
-        "N" => vec![StandardKeys::LeftShift as u8, StandardKeys::N as u8],
-        "O" => vec![StandardKeys::LeftShift as u8, StandardKeys::O as u8],
-        "P" => vec![StandardKeys::LeftShift as u8, StandardKeys::P as u8],
-        "Q" => vec![StandardKeys::LeftShift as u8, StandardKeys::Q as u8],
-        "R" => vec![StandardKeys::LeftShift as u8, StandardKeys::R as u8],
-        "S" => vec![StandardKeys::LeftShift as u8, StandardKeys::S as u8],
-        "T" => vec![StandardKeys::LeftShift as u8, StandardKeys::T as u8],
-        "U" => vec![StandardKeys::LeftShift as u8, StandardKeys::U as u8],
-        "V" => vec![StandardKeys::LeftShift as u8, StandardKeys::V as u8],
-        "W" => vec![StandardKeys::LeftShift as u8, StandardKeys::W as u8],
-        "X" => vec![StandardKeys::LeftShift as u8, StandardKeys::X as u8],
-        "Y" => vec![StandardKeys::LeftShift as u8, StandardKeys::Y as u8],
-        "Z" => vec![StandardKeys::LeftShift as u8, StandardKeys::Z as u8],
+        "A" => vec![KC_LeftShift as u8, KC_A as u8],
+        "B" => vec![KC_LeftShift as u8, KC_B as u8],
+        "C" => vec![KC_LeftShift as u8, KC_C as u8],
+        "D" => vec![KC_LeftShift as u8, KC_D as u8],
+        "E" => vec![KC_LeftShift as u8, KC_E as u8],
+        "F" => vec![KC_LeftShift as u8, KC_F as u8],
+        "G" => vec![KC_LeftShift as u8, KC_G as u8],
+        "H" => vec![KC_LeftShift as u8, KC_H as u8],
+        "I" => vec![KC_LeftShift as u8, KC_I as u8],
+        "J" => vec![KC_LeftShift as u8, KC_J as u8],
+        "K" => vec![KC_LeftShift as u8, KC_K as u8],
+        "L" => vec![KC_LeftShift as u8, KC_L as u8],
+        "M" => vec![KC_LeftShift as u8, KC_M as u8],
+        "N" => vec![KC_LeftShift as u8, KC_N as u8],
+        "O" => vec![KC_LeftShift as u8, KC_O as u8],
+        "P" => vec![KC_LeftShift as u8, KC_P as u8],
+        "Q" => vec![KC_LeftShift as u8, KC_Q as u8],
+        "R" => vec![KC_LeftShift as u8, KC_R as u8],
+        "S" => vec![KC_LeftShift as u8, KC_S as u8],
+        "T" => vec![KC_LeftShift as u8, KC_T as u8],
+        "U" => vec![KC_LeftShift as u8, KC_U as u8],
+        "V" => vec![KC_LeftShift as u8, KC_V as u8],
+        "W" => vec![KC_LeftShift as u8, KC_W as u8],
+        "X" => vec![KC_LeftShift as u8, KC_X as u8],
+        "Y" => vec![KC_LeftShift as u8, KC_Y as u8],
+        "Z" => vec![KC_LeftShift as u8, KC_Z as u8],
         // Number row
-        "1" => vec![StandardKeys::Num1 as u8],
-        "2" => vec![StandardKeys::Num2 as u8],
-        "3" => vec![StandardKeys::Num3 as u8],
-        "4" => vec![StandardKeys::Num4 as u8],
-        "5" => vec![StandardKeys::Num5 as u8],
-        "6" => vec![StandardKeys::Num6 as u8],
-        "7" => vec![StandardKeys::Num7 as u8],
-        "8" => vec![StandardKeys::Num8 as u8],
-        "9" => vec![StandardKeys::Num9 as u8],
-        "0" => vec![StandardKeys::Num0 as u8],
+        "1" => vec![KC_Num1 as u8],
+        "2" => vec![KC_Num2 as u8],
+        "3" => vec![KC_Num3 as u8],
+        "4" => vec![KC_Num4 as u8],
+        "5" => vec![KC_Num5 as u8],
+        "6" => vec![KC_Num6 as u8],
+        "7" => vec![KC_Num7 as u8],
+        "8" => vec![KC_Num8 as u8],
+        "9" => vec![KC_Num9 as u8],
+        "0" => vec![KC_Num0 as u8],
         // Number row symbols
-        "!" => vec![StandardKeys::LeftShift as u8, StandardKeys::Num1 as u8],
-        "@" => vec![StandardKeys::LeftShift as u8, StandardKeys::Num2 as u8],
-        "#" => vec![StandardKeys::LeftShift as u8, StandardKeys::Num3 as u8],
-        "$" => vec![StandardKeys::LeftShift as u8, StandardKeys::Num4 as u8],
-        "%" => vec![StandardKeys::LeftShift as u8, StandardKeys::Num5 as u8],
-        "^" => vec![StandardKeys::LeftShift as u8, StandardKeys::Num6 as u8],
-        "&" => vec![StandardKeys::LeftShift as u8, StandardKeys::Num7 as u8],
-        "*" => vec![StandardKeys::LeftShift as u8, StandardKeys::Num8 as u8],
-        "(" => vec![StandardKeys::LeftShift as u8, StandardKeys::Num9 as u8],
-        ")" => vec![StandardKeys::LeftShift as u8, StandardKeys::Num0 as u8],
+        "!" => vec![KC_LeftShift as u8, KC_Num1 as u8],
+        "@" => vec![KC_LeftShift as u8, KC_Num2 as u8],
+        "#" => vec![KC_LeftShift as u8, KC_Num3 as u8],
+        "$" => vec![KC_LeftShift as u8, KC_Num4 as u8],
+        "%" => vec![KC_LeftShift as u8, KC_Num5 as u8],
+        "^" => vec![KC_LeftShift as u8, KC_Num6 as u8],
+        "&" => vec![KC_LeftShift as u8, KC_Num7 as u8],
+        "*" => vec![KC_LeftShift as u8, KC_Num8 as u8],
+        "(" => vec![KC_LeftShift as u8, KC_Num9 as u8],
+        ")" => vec![KC_LeftShift as u8, KC_Num0 as u8],
         // Other characters
-        "`" => vec![StandardKeys::Grave as u8],
-        "," => vec![StandardKeys::Comma as u8],
-        "." => vec![StandardKeys::Dot as u8],
-        "/" => vec![StandardKeys::Slash as u8],
-        "\'" => vec![StandardKeys::Quote as u8],
-        ";" => vec![StandardKeys::Semicolon as u8],
-        "\\" => vec![StandardKeys::Backslash as u8],
-        "[" => vec![StandardKeys::LeftBracket as u8],
-        "]" => vec![StandardKeys::RightBracket as u8],
-        "=" => vec![StandardKeys::Equal as u8],
-        "-" => vec![StandardKeys::Minus as u8],
+        "`" => vec![KC_Grave as u8],
+        "," => vec![KC_Comma as u8],
+        "." => vec![KC_Dot as u8],
+        "/" => vec![KC_Slash as u8],
+        "\'" => vec![KC_Quote as u8],
+        ";" => vec![KC_Semicolon as u8],
+        "\\" => vec![KC_Backslash as u8],
+        "[" => vec![KC_LeftBracket as u8],
+        "]" => vec![KC_RightBracket as u8],
+        "=" => vec![KC_Equal as u8],
+        "-" => vec![KC_Minus as u8],
         // Other characters shifted
-        "~" => vec![StandardKeys::LeftShift as u8, StandardKeys::Grave as u8],
-        "<" => vec![StandardKeys::LeftShift as u8, StandardKeys::Comma as u8],
-        ">" => vec![StandardKeys::LeftShift as u8, StandardKeys::Dot as u8],
-        "?" => vec![StandardKeys::LeftShift as u8, StandardKeys::Slash as u8],
-        "\"" => vec![StandardKeys::LeftShift as u8, StandardKeys::Quote as u8],
-        ":" => vec![StandardKeys::LeftShift as u8, StandardKeys::Semicolon as u8],
-        "|" => vec![StandardKeys::LeftShift as u8, StandardKeys::Backslash as u8],
+        "~" => vec![KC_LeftShift as u8, KC_Grave as u8],
+        "<" => vec![KC_LeftShift as u8, KC_Comma as u8],
+        ">" => vec![KC_LeftShift as u8, KC_Dot as u8],
+        "?" => vec![KC_LeftShift as u8, KC_Slash as u8],
+        "\"" => vec![KC_LeftShift as u8, KC_Quote as u8],
+        ":" => vec![KC_LeftShift as u8, KC_Semicolon as u8],
+        "|" => vec![KC_LeftShift as u8, KC_Backslash as u8],
         "{" => vec![
-            StandardKeys::LeftShift as u8,
-            StandardKeys::LeftBracket as u8,
+            KC_LeftShift as u8,
+            KC_LeftBracket as u8,
         ],
         "}" => vec![
-            StandardKeys::LeftShift as u8,
-            StandardKeys::RightBracket as u8,
+            KC_LeftShift as u8,
+            KC_RightBracket as u8,
         ],
-        "+" => vec![StandardKeys::LeftShift as u8, StandardKeys::Equal as u8],
-        "_" => vec![StandardKeys::LeftShift as u8, StandardKeys::Minus as u8],
-        // "*" => vec![StandardKeys::KpAsterisk as u8],
-        " " => vec![StandardKeys::Space as u8],
+        "+" => vec![KC_LeftShift as u8, KC_Equal as u8],
+        "_" => vec![KC_LeftShift as u8, KC_Minus as u8],
+        // "*" => vec![KpAsterisk as u8],
+        " " => vec![KC_Space as u8],
         // Otherwise it's 0
-        _ => vec![StandardKeys::No as u8],
+        _ => vec![KC_No as u8],
     };
     res
 }
@@ -175,6 +172,15 @@ fn string_to_keycode(s: String) -> Vec<Vec<u8>> {
     chars
 }
 fn main() {
+    // the default keymap
+
+    // the keyboard keymap
+    let keymap = [
+        [
+            1
+        ]
+    ];
+
     let api = hidapi::HidApi::new().unwrap();
     let device = api.open(VENDOR_ID, PRODUCT_ID).unwrap();
 
@@ -190,6 +196,11 @@ fn main() {
 
     let set_color_side = |side: u8, r: u8, g: u8, b: u8| {
         let buf = [0x1, 3, side, r, g, b];
+        device.write(&buf).unwrap();
+    };
+
+    let conditional_set_color = |led: u8, r: u8, g: u8, b: u8| {
+        let buf = [0x1, 7, led, r, g, b];
         device.write(&buf).unwrap();
     };
 
@@ -226,31 +237,57 @@ fn main() {
     };
 
     let intercepts = |kc: u8, e: u8| {
-        if kc == StandardKeys::Escape as u8
-        {   
-            if e == 0 {
-                intercept_mode(1);
-                reg_key(StandardKeys::A as u8);
-            } else {
-                intercept_mode(0);
-                unreg_key(StandardKeys::A as u8);
-            }
-        }
+        // if kc == Escape as u8
+        // {   
+        //     if e == 0 {
+        //         intercept_mode(1);
+        //         reg_key(A as u8);
+        //     } else {
+        //         intercept_mode(0);
+        //         unreg_key(A as u8);
+        //     }
+        // }
+    };
+
+    let jack_keymap: [keebLib::codes::Keys; 83] = 
+        [
+        KC_A,  KC_F1,  KC_F2,  KC_F3,  KC_F4,  KC_F5,  KC_F6,  KC_F7,  KC_F8,  KC_F9,  KC_F10,  KC_F11,  KC_F12,  KC_PrintScreen,                                   KC_AudioMute,
+        KC_Grave,   KC_Num1,KC_Num2,KC_Num3,KC_Num4,KC_Num5,KC_Num6,KC_Num7,KC_Num8,KC_Num9,KC_Num0, KC_Minus, KC_Equal,  KC_Backspace,                                  KC_Delete,
+        KC_Tab,     KC_Q,   KC_W,   KC_E,   KC_R,   KC_T,   KC_Y,   KC_U,   KC_I,   KC_O,   KC_P,    KC_LeftBracket, KC_RightBracket, KC_Backslash,                      KC_PageUp,
+        KC_CapsLock,KC_A,   KC_S,   KC_D,   KC_F,   KC_G,   KC_H,   KC_J,   KC_K,   KC_L,   KC_Semicolon, KC_Quote, KC_Enter,                                            KC_PageDown,
+        KC_LeftShift,       KC_Z,   KC_X,   KC_C,   KC_V,   KC_B,   KC_N,   KC_M,   KC_Comma, KC_Dot,  KC_Slash, KC_RightShift,                        KC_Up,            KC_End,
+       KC_LeftCtrl, KC_Menu, KC_LeftAlt,                 KC_Space,                            KC_RightAlt, KC_RollOver,   KC_RightCtrl,      KC_Left, KC_Down, KC_Right
+    ];
+
+    let get_keycode_from_map = |kc:u8|{
+        let index = gmmk::pro::default_keymap().iter().position(|&r| r as u8 == kc).unwrap(); // gets the index of the pressed key in the keymap, pressed key is the physical key
+        let key = jack_keymap[index as usize]; // gets the keycode of the pressed key in the keymap, pressed key is the physical key
+        key
     };
 
     // events
     let on_key_down = |kc: u8| {
+        let key = get_keycode_from_map(kc);
+        reg_key(key as u8);
         intercepts(kc, 0);
+        // if(kc == RollOver as u8) {
+        //     conditional_set_color(GmmkProLed::Fn as u8, 255, 0, 0);
+        // }
     };
 
     let on_key_up = |kc: u8| {
+        let key = get_keycode_from_map(kc);
+        unreg_key(key as u8);
         intercepts(kc, 1);
+        // if kc == Escape as u8 {
+        //     type_string("Hello World".to_string());
+        // }
     };
 
     let on_knob_turned = |cw:bool|{
         match cw {
-            true => tap_code(MouseKeys::MsWhDown as u8),
-            false => tap_code(MouseKeys::MsWhUp as u8),
+            true => tap_code(KC_MsWhDown as u8),
+            false => tap_code(KC_MsWhUp as u8),
         }
     };
 
@@ -275,9 +312,13 @@ fn main() {
         }
     };
 
-    let mut color:u8 = 0;
+    let pre_read = || {
+        // runs 1000 times a second before any processing of events
+    };
+    intercept_mode(1);
     // input loop
     loop {
+        pre_read();
         // receiver configuration
         let mut buf = [0u8; 2];
         let res = device.read(&mut buf[..]).unwrap();
