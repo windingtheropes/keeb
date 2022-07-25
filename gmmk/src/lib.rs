@@ -15,10 +15,11 @@ pub mod pro {
 //    | Shift           | Z      | X      | C      | V      | B      | N      | M      | ,      | .      | /      | Shift           +--------+ End     |
 //    +-----------------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+-----------------+ Up     +--------+
 //    +--------+--------+--------+--------------------------------------------------------------+--------+--------+--------+--------+--------+--------+
-//    | Ctrl   | Alt    | Super  |                            Space                             | Alt    | MO(1)  | Ctrl   | Left   | Down   | Right  |
+//    | Ctrl   | Alt    | Super  |                            Space                             | Alt    | FN  | Ctrl   | Left   | Down   | Right  |
 //    +--------+--------+--------+--------------------------------------------------------------+--------+--------+--------+--------+--------+--------+
 
-    pub fn default_keymap() -> [keebLib::codes::Keys; 83] {
+// key 78 is fn key
+    pub const fn default_keymap() -> [keebLib::codes::Keys; 83] {
         [
         KC_Escape,  KC_F1,  KC_F2,  KC_F3,  KC_F4,  KC_F5,  KC_F6,  KC_F7,  KC_F8,  KC_F9,  KC_F10,  KC_F11,  KC_F12,  KC_PrintScreen,                                   KC_AudioMute,
         KC_Grave,   KC_Num1,KC_Num2,KC_Num3,KC_Num4,KC_Num5,KC_Num6,KC_Num7,KC_Num8,KC_Num9,KC_Num0, KC_Minus, KC_Equal,  KC_Backspace,                                  KC_Delete,
@@ -28,6 +29,12 @@ pub mod pro {
        KC_LeftCtrl, KC_Menu, KC_LeftAlt,                 KC_Space,                            KC_RightAlt, KC_RollOver,   KC_RightCtrl,      KC_Left, KC_Down, KC_Right
     ]
     }
+
+    // Number of keys on the keyboard
+    pub const fn keycount() -> usize {
+        default_keymap().len()
+    }
+
     #[allow(non_camel_case_types)]
     #[derive(Clone, Copy)]
     // led naming based on the default layout of this keyboard.

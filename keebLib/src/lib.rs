@@ -5,6 +5,7 @@ pub mod codes {
     // Num1 is 1 in the number row
     // Kp1 is 1 in the keypad
     #[derive(Debug, EnumIter, Copy, Clone)]
+    #[allow(non_camel_case_types)]
     pub enum Keys {
         KC_No = 0x00,
         KC_RollOver = 1,
@@ -268,7 +269,10 @@ pub mod codes {
         fn as_led(key: Keys) -> Option<u8>;
     }
 
-    pub fn _______() -> Keys {
-        self::Keys::KC_No
+    pub enum extras {
+        ________ = 0x00,
     }
+    // pub fn ________() -> Keys {
+    //     self::Keys::KC_No
+    // }
 }

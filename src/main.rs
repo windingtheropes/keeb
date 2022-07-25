@@ -18,7 +18,7 @@
     // 4: high level key manipulation; key tap | [4, 0] taps keycode 0
     // 5: low level key manipulation; key register/unregister | [5, 1, 0] registers keycode 1. input registered until unregistered.
     // 6: intercept mode: will disable sending keypresses to the operating system, to be intercepted by this program; turn on/off | [6, 1] turns on intercept mode
-    // 7: conditional single led | [7, 1, 255, 255, 255] turns key 1 to white if it was previously off,  or turns key 1 to off if it was on.
+    // 7: ping function | [7] reminds the keyboard that the program is still running
 
     // Reading data from the device
     // ********
@@ -38,9 +38,12 @@ const VENDOR_ID: u16 = 0x320F;
 const PRODUCT_ID: u16 = 0x5044;
 
 use hidapi;
+
+use std::collections::HashMap;
+use std::cell::RefCell;
+
 use keebLib::codes::Keys::*;
 use keebLib::codes::EnumInt;
-use gmmk::pro::Leds::*;
 
 fn char_to_keycode(s: String) -> Vec<u8> {
     let s = s.as_str();
@@ -105,7 +108,7 @@ fn char_to_keycode(s: String) -> Vec<u8> {
         "3" => vec![KC_Num3 as u8],
         "4" => vec![KC_Num4 as u8],
         "5" => vec![KC_Num5 as u8],
-        "6" => vec![KC_Num6 as u8],
+        "6" => vec![KC_Num6 as u8], 
         "7" => vec![KC_Num7 as u8],
         "8" => vec![KC_Num8 as u8],
         "9" => vec![KC_Num9 as u8],
@@ -172,6 +175,8 @@ fn string_to_keycode(s: String) -> Vec<Vec<u8>> {
     chars
 }
 fn main() {
+    println!("Keeb started");
+    let mut exit = RefCell::new(false);
     // the default keymap
 
     // the keyboard keymap
@@ -203,6 +208,7 @@ fn main() {
         let buf = [0x1, 7, led, r, g, b];
         device.write(&buf).unwrap();
     };
+
 
     let tap_code = |kc: u8| {
         let buf = [0x1, 4, kc];
@@ -249,45 +255,69 @@ fn main() {
         // }
     };
 
-    let jack_keymap: [keebLib::codes::Keys; 83] = 
+    let layer_main = 
         [
-        KC_A,  KC_F1,  KC_F2,  KC_F3,  KC_F4,  KC_F5,  KC_F6,  KC_F7,  KC_F8,  KC_F9,  KC_F10,  KC_F11,  KC_F12,  KC_PrintScreen,                                   KC_AudioMute,
+        KC_Escape,  KC_F1,  KC_F2,  KC_F3,  KC_F4,  KC_F5,  KC_F6,  KC_F7,  KC_F8,  KC_F9,  KC_F10,  KC_F11,  KC_F12,  KC_PrintScreen,                                   KC_AudioMute,
         KC_Grave,   KC_Num1,KC_Num2,KC_Num3,KC_Num4,KC_Num5,KC_Num6,KC_Num7,KC_Num8,KC_Num9,KC_Num0, KC_Minus, KC_Equal,  KC_Backspace,                                  KC_Delete,
         KC_Tab,     KC_Q,   KC_W,   KC_E,   KC_R,   KC_T,   KC_Y,   KC_U,   KC_I,   KC_O,   KC_P,    KC_LeftBracket, KC_RightBracket, KC_Backslash,                      KC_PageUp,
         KC_CapsLock,KC_A,   KC_S,   KC_D,   KC_F,   KC_G,   KC_H,   KC_J,   KC_K,   KC_L,   KC_Semicolon, KC_Quote, KC_Enter,                                            KC_PageDown,
         KC_LeftShift,       KC_Z,   KC_X,   KC_C,   KC_V,   KC_B,   KC_N,   KC_M,   KC_Comma, KC_Dot,  KC_Slash, KC_RightShift,                        KC_Up,            KC_End,
        KC_LeftCtrl, KC_Menu, KC_LeftAlt,                 KC_Space,                            KC_RightAlt, KC_RollOver,   KC_RightCtrl,      KC_Left, KC_Down, KC_Right
+    ].iter().map(|&e| e as u32).collect::<Vec<u32>>();
+    
+    let keys_down = RefCell::new(HashMap::new());
+    let set_key_down = |keycode: u8, down: bool| {
+        let mut keys_down = keys_down.borrow_mut();
+        if keys_down.contains_key(&keycode) {
+            keys_down.insert(keycode, down);
+        } else {
+            keys_down.insert(keycode, down);
+        }
+    };
+    let is_key_down = |kc:u8| -> bool {
+        let keys_down = keys_down.borrow();
+        keys_down.get(&kc).unwrap_or_else(|| return &false) == &true
+    };
+
+    let km: Vec<Vec<u32>> = vec![
+        layer_main
     ];
-
-    let get_keycode_from_map = |kc:u8|{
+    
+    let get_keycode_from_map = |kc:u8, map: &Vec<u32>|{
         let index = gmmk::pro::default_keymap().iter().position(|&r| r as u8 == kc).unwrap(); // gets the index of the pressed key in the keymap, pressed key is the physical key
-        let key = jack_keymap[index as usize]; // gets the keycode of the pressed key in the keymap, pressed key is the physical key
-        key
+        let key = map[index as usize]; // gets the keycode of the pressed key in the keymap, pressed key is the physical key
+        (index, key)
     };
 
-    // events
-    let on_key_down = |kc: u8| {
-        let key = get_keycode_from_map(kc);
+    let mut on_key_down = |kc: u8| {
+        set_key_down(kc, true);
+
+        // Follow keymaps
+        let (index, key) = get_keycode_from_map(kc, &km[0]);
         reg_key(key as u8);
-        intercepts(kc, 0);
-        // if(kc == RollOver as u8) {
-        //     conditional_set_color(GmmkProLed::Fn as u8, 255, 0, 0);
-        // }
-    };
-
+    }; 
     let on_key_up = |kc: u8| {
-        let key = get_keycode_from_map(kc);
+        set_key_down(kc, false);
+
+        // Follow keymaps
+        let (index, key) = get_keycode_from_map(kc, &km[0]);
+        // Unregister layer keys if the layer key is lifted
         unreg_key(key as u8);
-        intercepts(kc, 1);
-        // if kc == Escape as u8 {
-        //     type_string("Hello World".to_string());
-        // }
+
+        if is_key_down(KC_RollOver as u8) {
+            if key as u8 == KC_Backslash as u8 {
+                let mut exit = exit.borrow_mut();
+                *exit = true;
+                unreg_key(KC_RollOver as u8);
+                unreg_key(KC_Backslash as u8);
+            }
+        }
     };
 
     let on_knob_turned = |cw:bool|{
         match cw {
-            true => tap_code(KC_MsWhDown as u8),
-            false => tap_code(KC_MsWhUp as u8),
+            true => tap_code(KC_AudioVolUp as u8),
+            false => tap_code(KC_AudioVolDown as u8),
         }
     };
 
@@ -312,24 +342,21 @@ fn main() {
         }
     };
 
-    let pre_read = || {
-        // runs 1000 times a second before any processing of events
-    };
     intercept_mode(1);
     // input loop
     loop {
-        pre_read();
+        let exit = exit.borrow().to_owned();
+        if exit == true { intercept_mode(0); break; }
         // receiver configuration
         let mut buf = [0u8; 2];
         let res = device.read(&mut buf[..]).unwrap();
         // received data from the keyboard
         let payload = &buf[..res];
-        
         // parse the payload
         if payload[0] != 0 {
             // this means there was some kind of event
             on_keyboard_event(payload);
         }
-        // thread::sleep(Duration::from_millis(1));
     }
+    println!("Keeb exiting...");
 }
