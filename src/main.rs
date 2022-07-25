@@ -38,12 +38,14 @@ const VENDOR_ID: u16 = 0x320F;
 const PRODUCT_ID: u16 = 0x5044;
 
 use hidapi;
+use keebLib::codes::layer;
 
 use std::collections::HashMap;
 use std::cell::RefCell;
 
 use keebLib::codes::Keys::*;
 use keebLib::codes::EnumInt;
+use keebLib::codes::extras::________;
 
 fn char_to_keycode(s: String) -> Vec<u8> {
     let s = s.as_str();
@@ -254,8 +256,17 @@ fn main() {
         //     }
         // }
     };
-
-    let layer_main = 
+    // PLANNING
+    // the keymap will contain u32 values, 0-255 are keycodes. 
+    // 256 - 288 are reserved for layers. top and bottom inclusive.
+    // functions will be stored in a hashmap by u32 values over 288.
+    let functions: RefCell<HashMap<u32, fn(kc: u8)>> = RefCell::new(HashMap::new());
+    let layer_function = |f: fn(kc: u8)| {
+        let mut functions = functions.borrow_mut();
+        functions.insert(289, f);
+    };
+    // TEMPORARILY MUTABLE, in the future it will probably be modified to be immutable and better
+    let mut layer_main = 
         [
         KC_Escape,  KC_F1,  KC_F2,  KC_F3,  KC_F4,  KC_F5,  KC_F6,  KC_F7,  KC_F8,  KC_F9,  KC_F10,  KC_F11,  KC_F12,  KC_PrintScreen,                                   KC_AudioMute,
         KC_Grave,   KC_Num1,KC_Num2,KC_Num3,KC_Num4,KC_Num5,KC_Num6,KC_Num7,KC_Num8,KC_Num9,KC_Num0, KC_Minus, KC_Equal,  KC_Backspace,                                  KC_Delete,
@@ -264,6 +275,19 @@ fn main() {
         KC_LeftShift,       KC_Z,   KC_X,   KC_C,   KC_V,   KC_B,   KC_N,   KC_M,   KC_Comma, KC_Dot,  KC_Slash, KC_RightShift,                        KC_Up,            KC_End,
        KC_LeftCtrl, KC_Menu, KC_LeftAlt,                 KC_Space,                            KC_RightAlt, KC_RollOver,   KC_RightCtrl,      KC_Left, KC_Down, KC_Right
     ].iter().map(|&e| e as u32).collect::<Vec<u32>>();
+    // TEMPORARILY THERE IS NO ORGANIZED SYSTEM FOR LAYERS
+    // THE FN KEY IS AT INDEX 78, SO WE CAN MODIFY IT TO BE A LAYER activation key to activate layer 1
+    layer_main[78] = layer(1);
+    let mut layer_1 = 
+        [
+        KC_Escape,  KC_F1,  KC_F2,  KC_F3,  KC_F4,  KC_F5,  KC_F6,  KC_F7,  KC_F8,  KC_F9,  KC_F10,  KC_F11,  KC_F12,  KC_PrintScreen,                                   KC_AudioMute,
+        KC_Grave,   KC_Num1,KC_Num2,KC_Num3,KC_Num4,KC_Num5,KC_Num6,KC_Num7,KC_Num8,KC_Num9,KC_Num0, KC_Minus, KC_Equal,  KC_Backspace,                                  KC_Delete,
+        KC_Tab,     KC_Q,   KC_W,   KC_E,   KC_R,   KC_T,   KC_Y,   KC_U,   KC_I,   KC_O,   KC_P,    KC_LeftBracket, KC_RightBracket, KC_Backslash,                      KC_PageUp,
+        KC_CapsLock,KC_A,   KC_S,   KC_D,   KC_F,   KC_G,   KC_H,   KC_J,   KC_K,   KC_L,   KC_Semicolon, KC_Quote, KC_Enter,                                            KC_PageDown,
+        KC_LeftShift,       KC_Z,   KC_X,   KC_C,   KC_V,   KC_B,   KC_N,   KC_M,   KC_Comma, KC_Dot,  KC_Slash, KC_RightShift,                        KC_Up,            KC_End,
+       KC_LeftCtrl, KC_Menu, KC_LeftAlt,                 KC_Space,                            KC_RightAlt, KC_RollOver,   KC_RightCtrl,      KC_Left, KC_Down, KC_Right
+    ].iter().map(|&e| e as u32).collect::<Vec<u32>>();
+    
     
     let keys_down = RefCell::new(HashMap::new());
     let set_key_down = |keycode: u8, down: bool| {
@@ -280,7 +304,8 @@ fn main() {
     };
 
     let km: Vec<Vec<u32>> = vec![
-        layer_main
+        layer_main,
+        layer_1
     ];
     
     let get_keycode_from_map = |kc:u8, map: &Vec<u32>|{
@@ -294,7 +319,25 @@ fn main() {
 
         // Follow keymaps
         let (index, key) = get_keycode_from_map(kc, &km[0]);
-        reg_key(key as u8);
+        
+        // This checks if the value of the key is a layer activation key or a function key, both of which are not u8 or keycodes, then if theyre not it will register the key as normal
+        if(layer_main[index as usize] > 255 && layer_main[index as usize] <= 288) {
+            // this is a layer key because it's within bounds off 256 and 288
+            let layer_index = layer_main[index as usize] - 256;
+            let layer = &km[layer_index as usize];
+            
+        }
+        else if layer_main[index as usize] > 288 {
+            // this is a function pointer because it's greater than 288
+            let layer_index = layer_main[index as usize] - 288;
+            let layer = &km[layer_index as usize];
+        }
+        else {
+            // this *should* never panic because above we have checked for the possibilities of the layer key being out of an 8 bit number's bounds
+            reg_key(layer_main[index as usize].try_into().unwrap());
+        }
+        // Follow layers
+
     }; 
     let on_key_up = |kc: u8| {
         set_key_down(kc, false);
@@ -304,6 +347,24 @@ fn main() {
         // Unregister layer keys if the layer key is lifted
         unreg_key(key as u8);
 
+        // This checks if the value of the key is a layer activation key or a function key, both of which are not u8 or keycodes, then if theyre not it will register the key as normal
+        if(layer_main[index as usize] > 255 && layer_main[index as usize] <= 288) {
+            // this is a layer key because it's within bounds off 256 and 288
+            let layer_index = layer_main[index as usize] - 256;
+            let layer = &km[layer_index as usize];
+        
+        }
+        else if layer_main[index as usize] > 288 {
+            // this is a function pointer because it's greater than 288
+            let layer_index = layer_main[index as usize] - 288;
+            let layer = &km[layer_index as usize];
+        }
+        else {
+            // this *should* never panic because above we have checked for the possibilities of the layer key being out of an 8 bit number's bounds
+            unreg_key(layer_main[index as usize].try_into().unwrap());
+        }
+
+        // Soft exit keybind
         if is_key_down(KC_RollOver as u8) {
             if key as u8 == KC_Backslash as u8 {
                 let mut exit = exit.borrow_mut();
@@ -312,6 +373,10 @@ fn main() {
                 unreg_key(KC_Backslash as u8);
             }
         }
+
+        // Follow layers
+        // index is the index of the pressed key in the keymap, pressed key is the physical key, which could differ from the keycode of the pressed key. the index is used to get the physical locaiton of differing keys
+        
     };
 
     let on_knob_turned = |cw:bool|{

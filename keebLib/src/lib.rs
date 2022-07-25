@@ -269,10 +269,11 @@ pub mod codes {
         fn as_led(key: Keys) -> Option<u8>;
     }
 
+    pub fn layer(layer: u8) -> u32 {
+        if(layer < 1 || layer > 32) { panic!("Layer must be greater than 0 and less than 33")}
+        (255 + layer) as u32
+    }
     pub enum extras {
         ________ = 0x00,
     }
-    // pub fn ________() -> Keys {
-    //     self::Keys::KC_No
-    // }
 }
