@@ -260,10 +260,15 @@ fn main() {
     // the keymap will contain u32 values, 0-255 are keycodes. 
     // 256 - 288 are reserved for layers. top and bottom inclusive.
     // functions will be stored in a hashmap by u32 values over 288.
+    let mut latestf = RefCell::new(0);
     let functions: RefCell<HashMap<u32, fn(kc: u32, down:bool)>> = RefCell::new(HashMap::new());
-    let layer_function = |f: fn(kc: u32, down: bool)| {
+    let layer_function = |f: fn(kc: u32, down: bool)| -> u32 {
         let mut functions = functions.borrow_mut();
-        functions.insert(289, f);
+        let lat = latestf.borrow().to_owned();
+        let id = 289+lat;
+        functions.insert(id, f);
+        latestf.replace(lat+1);
+        return id;
     };
 
     let active_layer = RefCell::new(0);
@@ -271,19 +276,22 @@ fn main() {
         let mut active_layer = active_layer.borrow_mut();
         *active_layer = l;
     };
+    fn yes(kc: u32, down: bool) {
+        println!("yes");
+    }
     // TEMPORARILY MUTABLE, in the future it will probably be modified to be immutable and better
-    let mut layer_main = 
+    let layer_main = 
        RefCell::new( [
         KC_Escape.i(),  KC_F1.i(),  KC_F2.i(),  KC_F3.i(),  KC_F4.i(),  KC_F5.i(),  KC_F6.i(),  KC_F7.i(),  KC_F8.i(),  KC_F9.i(),  KC_F10.i(),  KC_F11.i(),  KC_F12.i(),  KC_PrintScreen.i(),                             KC_AudioMute.i(),
         KC_Grave.i(),   KC_Num1.i(),KC_Num2.i(),KC_Num3.i(),KC_Num4.i(),KC_Num5.i(),KC_Num6.i(),KC_Num7.i(),KC_Num8.i(),KC_Num9.i(),KC_Num0.i(), KC_Minus.i(), KC_Equal.i(),  KC_Backspace.i(),                            KC_Delete.i(),
         KC_Tab.i(),     KC_Q.i(),   KC_W.i(),   KC_E.i(),   KC_R.i(),   KC_T.i(),   KC_Y.i(),   KC_U.i(),   KC_I.i(),   KC_O.i(),   KC_P.i(),    KC_LeftBracket.i(), KC_RightBracket.i(), KC_Backslash.i(),                KC_PageUp.i(),
         KC_CapsLock.i(),KC_A.i(),   KC_S.i(),   KC_D.i(),   KC_F.i(),   KC_G.i(),   KC_H.i(),   KC_J.i(),   KC_K.i(),   KC_L.i(),   KC_Semicolon.i(), KC_Quote.i(), KC_Enter.i(),                                          KC_PageDown.i(),
         KC_LeftShift.i(),  KC_Z.i(),   KC_X.i(),   KC_C.i(),   KC_V.i(),   KC_B.i(),   KC_N.i(),   KC_M.i(),   KC_Comma.i(), KC_Dot.i(),  KC_Slash.i(), KC_RightShift.i(),                 KC_Up.i(),                      KC_End.i(),
-       KC_LeftCtrl.i(), KC_Menu.i(), KC_LeftAlt.i(),                 KC_Space.i(),                            KC_RightAlt.i(), layer(1),   KC_RightCtrl.i(),                 KC_Left.i(), KC_Down.i(), KC_Right.i()
+       KC_LeftCtrl.i(), KC_Menu.i(), KC_LeftAlt.i(),                 KC_Space.i(),                            KC_RightAlt.i(), layer_function(yes),   KC_RightCtrl.i(),                 KC_Left.i(), KC_Down.i(), KC_Right.i()
     ].iter().map(|&e| e as u32).collect::<Vec<u32>>());
     // TEMPORARILY THERE IS NO ORGANIZED SYSTEM FOR LAYERS
     // THE FN KEY IS AT INDEX 78, SO WE CAN MODIFY IT TO BE A LAYER activation key to activate layer 1
-    let mut layer_1 = 
+    let layer_1 = 
         RefCell::new([
         KC_Escape,  KC_F1,  KC_F2,  KC_F3,  KC_F4,  KC_F5,  KC_F6,  KC_F7,  KC_F8,  KC_F9,  KC_F10,  KC_F11,  KC_F12,  KC_PrintScreen,                                   KC_AudioMute,
         KC_Grave,   KC_Num1,KC_Num2,KC_Num3,KC_Num4,KC_Num5,KC_Num6,KC_Num7,KC_Num8,KC_Num9,KC_Num0, KC_Minus, KC_Equal,  KC_Backspace,                                  KC_Delete,
@@ -318,8 +326,10 @@ fn main() {
         let key = map[index as usize]; // gets the keycode of the pressed key in the keymap, pressed key is the physical key
         (index, key)
     };
-    let mut on_key_down = |kc: u32| {
+    let mut on_key_down = |kc: u32| -> () {
         // set_key_down(kc, true);
+        // never register the physical key, which kc is
+        // we need to go through processing before deciding what key presses do
 
         let layer_main = layer_main.borrow().to_owned();
         // Follow keymaps
@@ -327,24 +337,25 @@ fn main() {
         
         
         // This checks if the value of the key is a layer activation key or a function key, both of which are not u8 or keycodes, then if theyre not it will register the key as normal
-        if layer_main[index as usize] > 255 && layer_main[index as usize] <= 288 {
-            let extended_keycode = &layer_main[index as usize];
-            set_key_down(*extended_keycode, true);
-            // this is a layer key because it's within bounds off 256 and 288
-            let layer_index = &layer_main[index as usize] - 256;
-            let layer = &km[layer_index as usize].to_owned();
-            set_layer(layer_index);
-            
-        }
-        else if layer_main[index as usize] > 288 {
-            let extended_keycode = &layer_main[index as usize];
-            set_key_down(*extended_keycode, true);
-            // this is a function pointer because it's greater than 288
-            let layer_index = &layer_main[index as usize] - 288;
-            let layer = &km[layer_index as usize].to_owned();
-            // running the function with parameters of the key going down
-            let fns = functions.borrow();
-            fns.get(&layer_index).unwrap()(kc, true);
+        let main_mapped_keycode = layer_main[index as usize]; // this is the keycode of the pressed key in the keymap, kc is the physical key.
+        if(main_mapped_keycode > 255) {
+            if main_mapped_keycode > 255 && main_mapped_keycode <= 288 {
+                set_key_down(main_mapped_keycode, true);
+                // this is a layer key because it's within bounds off 256 and 288
+                let layer_index = &layer_main[index as usize] - 256;
+                let layer = &km[layer_index as usize].to_owned();
+                set_layer(layer_index);
+                
+            }
+            else if main_mapped_keycode > 288 {
+                set_key_down(main_mapped_keycode, true);
+                // this is a function pointer because it's greater than 288
+                let fns = functions.borrow();
+                let fun = fns.get(&main_mapped_keycode).unwrap();
+                // running the function with parameters of the key going down
+                let fns = functions.borrow();
+                fns.get(&main_mapped_keycode).unwrap()(kc, true);
+            }
         }
         else {
             // this *should* never panic because above we have checked for the possibilities of the layer key being out of an 8 bit number's bounds
@@ -360,33 +371,34 @@ fn main() {
         let layer_main = layer_main.borrow().to_owned();
         // Follow keymaps
         let (index, key) = get_keycode_from_map(kc, &layer_main);
-        // Unregister layer keys if the layer key is lifted
-        unreg_key(key as u8);
+        // // Unregister layer keys if the layer key is lifted
+        // unreg_key(key as u8);
 
         // This checks if the value of the key is a layer activation key or a function key, both of which are not u8 or keycodes, then if theyre not it will register the key as normal
-        if(layer_main[index as usize] > 255 && layer_main[index as usize] <= 288) {
-            let extended_keycode = &layer_main[index as usize];
-            set_key_down(*extended_keycode, false);
-            // this is a layer key because it's within bounds off 256 and 288
-            let layer_index = layer_main[index as usize] - 256;
-            let layer = &km[layer_index as usize].to_owned();
-            // the key has just gone up, so we can disable the layer
-            set_layer(0);
-        }
-        else if layer_main[index as usize] > 288 {
-            let extended_keycode = &layer_main[index as usize];
-            set_key_down(*extended_keycode, false);
-            // this is a function pointer because it's greater than 288
-            let layer_index = layer_main[index as usize] - 288;
-            let layer = &km[layer_index as usize].to_owned();
-            // running the function with parameters of the key going up
-            let fns = functions.borrow();
-            fns.get(&layer_index).unwrap()(kc, false);
+        let main_mapped_keycode = layer_main[index as usize]; // this is the keycode of the pressed key in the keymap, kc is the physical key.
+        if(main_mapped_keycode > 255) {
+            if main_mapped_keycode > 255 && main_mapped_keycode <= 288 {
+                set_key_down(main_mapped_keycode, false);
+                // this is a layer key because it's within bounds off 256 and 288
+                let layer_index = &layer_main[index as usize] - 256;
+                let layer = &km[layer_index as usize].to_owned();
+                set_layer(layer_index);
+                
+            }
+            else if main_mapped_keycode > 288 {
+                set_key_down(main_mapped_keycode, false);
+                // this is a function pointer because it's greater than 288
+                let fns = functions.borrow();
+                let fun = fns.get(&main_mapped_keycode).unwrap();
+                // running the function with parameters of the key going down
+                let fns = functions.borrow();
+                fns.get(&main_mapped_keycode).unwrap()(kc, false);
+            }
         }
         else {
             // this *should* never panic because above we have checked for the possibilities of the layer key being out of an 8 bit number's bounds
             set_key_down(kc, false);
-            unreg_key(layer_main[index as usize].try_into().unwrap());
+            reg_key(layer_main[index as usize].try_into().unwrap());
         }
 
         // Soft exit keybind
