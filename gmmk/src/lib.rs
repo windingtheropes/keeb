@@ -143,6 +143,9 @@ pub mod pro {
         fn as_int(&self) -> u8 {
             *self as u8
         }
+        fn i(&self) -> u32 {
+            *self as u32
+        }
     }
 
     impl KeebLed for Leds {

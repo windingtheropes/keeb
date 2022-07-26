@@ -256,10 +256,15 @@ pub mod codes {
     }
 
     pub trait EnumInt {
+        // as int
+        fn i(&self) -> u32;
         fn as_int(&self) -> u8;
     }
 
     impl EnumInt for Keys {
+        fn i(&self) -> u32 {
+            *self as u32
+        }
         fn as_int(&self) -> u8 {
             *self as u8
         }
@@ -269,9 +274,9 @@ pub mod codes {
         fn as_led(key: Keys) -> Option<u8>;
     }
 
-    pub fn layer(layer: u8) -> u32 {
-        if(layer < 1 || layer > 32) { panic!("Layer must be greater than 0 and less than 33")}
-        (255 + layer) as u32
+    pub fn layer(layer: u32) -> u32 {
+        if layer < 1 || layer > 32 { panic!("Layer must be between 1 and 32"); }
+        (255 as u32 + layer as u32) as u32
     }
     pub enum extras {
         ________ = 0x00,
