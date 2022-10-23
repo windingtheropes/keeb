@@ -38,30 +38,18 @@ fn default_keymap() -> [Keys; 83] { [
         }
     }
 
-    pub fn gmmkPro() -> GmmkPro {
-        return GmmkPro {keeboard: Keeboard::new(String::from("GMMK Pro"), 83, 0x5044, 0x320F, &default_keymap())}
+    
+    pub fn gmmk_pro() -> GmmkPro {
+        return GmmkPro {
+            keeboard: Keeboard::new(
+                String::from("GMMK Pro"), 
+                83, 
+                0x5044, 
+                0x320F, 
+                &default_keymap()
+            )
+        }
     }
-    // pub const fn keyboard() -> kbd<'static> {
-    //     let name = "GMMK Pro";
-    //     let key_count: u8 = 83;
-    //     let vendor_id: u16 = 0x320F;
-    //     let product_id: u16 = 0x5044;
-    //     let usage_page: u16 = 0xFF60;
-    //     let usage: u16 = 0x61;
-
-    //     kbd {
-    //         name,
-    //         key_count,
-
-    //         product_id,
-    //         vendor_id,
-
-    //         usage_page,
-    //         usage,
-
-    //         default_keymap: vec![]
-    //     }
-    // }
 
     #[allow(non_camel_case_types)]
     #[derive(Clone, Copy)]
