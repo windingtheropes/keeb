@@ -438,27 +438,39 @@ pub mod keeb {
         // device: HidDevice
     }
 
+    pub struct Manager {
+        keeboard: Keeboard,
+        device: HidDevice
+    }
+
+    impl Manager {
+        fn new(keeboard: Keeboard, api: &HidApi) -> Manager {
+            let device = (|| {
+                for device in api.device_list() {
+                    if device.product_id() == keeboard.product_id && device.vendor_id() == keeboard.vendor_id && device.usage() == keeboard.usage && device.usage_page() == keeboard.usage_page
+                    {
+                        return device.open_device(api).unwrap()
+                    }
+                }
+                panic!("Cannot find device");
+            })();
+            Manager {
+                keeboard, 
+                device
+            }
+        }
+    }
+
     impl Keeboard {
-        // pub fn new(name: String, key_count: u8, product_id: u16, vendor_id: u16, default_keymap: &[Keys], api: &HidApi) -> Keeboard {
         pub fn new(
             name: String,
             key_count: u8,
             product_id: u16,
             vendor_id: u16,
-            default_keymap: &[Keys],
+            default_keymap: &[Keys]
         ) -> Keeboard {
             let usage_page = 0xFF60;
             let usage = 0x61;
-            // let device = (|| {
-            //     for device in api.device_list() {
-            //         if device.product_id() == product_id && device.vendor_id() == vendor_id && device.usage() == usage && device.usage_page() == usage_page
-            //         {
-            //             return device.open_device(api).unwrap()
-            //         }
-            //     }
-            //     panic!("Cannot find device");
-            // })();
-
             let default_keymap = default_keymap.to_vec();
             Keeboard {
                 name,
@@ -470,112 +482,25 @@ pub mod keeb {
                 usage,
 
                 default_keymap,
-                // device
             }
-        }
-        // pub fn device(&self) -> &HidDevice {
-        //     &self.device
-        // }
-    }
-
-    fn read_incoming(payload: &[u8], api: &HidApi) {
-        let method = payload[0];
-
-        match method {
-            1 => {
-                // key pressed
-                let key = payload[1];
-            }
-            2 => {
-                // key released
-                let key = payload[1];
-            }
-            3 => {
-                // extended functions
-                let clockwise = payload[1] == 1;
-            }
-            _ => {}
         }
     }
 
+  
 
-    // BEGIN WORKING SOLUTION
-    pub fn start_listener(keyboard: &impl manager, intercept: bool, api: &HidApi) {
-        let keeboard = keyboard.keeboard()
-        ;
-        let device = (|| {
-            for device in api.device_list() {
-                if device.product_id() == keeboard.product_id
-                    && device.vendor_id() == keeboard.vendor_id
-                    && device.usage() == keeboard.usage
-                    && device.usage_page() == keeboard.usage_page
-                {
-                    return device.open_device(api).unwrap();
-                }
-            }
-            panic!("Cannot find device");
-        })();
-        keyboard.out_intercept_mode(intercept, &device);
-        loop {
-            // receiver configuration
-            let mut buf = [0u8; 2];
-            let res = device.read(&mut buf[..]).unwrap();
-            // received data from the keyboard
-            let payload = &buf[..res];
+ 
+   
+        // loop {
+        //     // receiver configuration
+        //     let mut buf = [0u8; 2];
+        //     let res = device.read(&mut buf[..]).unwrap();
+        //     // received data from the keyboard
+        //     let payload = &buf[..res];
 
-            // read the payload
-            read_incoming(payload, api);
-        }
-    }
-    pub trait manager {
-        // INCOMING FUNCTIONS
-        // these incoming functions are basically worthless, might be removed soon. but for now are here for structure.
-        // // key down (1) [1, key]
-        // fn in_key_down(&self, payload: &[u8]) -> &[u8] {
-        //     payload
+        //     // read the payload
+        //     read_incoming(payload, api);
         // }
-
-        // // // key up (2) [2, key]
-        // fn in_key_up(&self, payload: &[u8]) -> &[u8] {
-        //     payload
-        // }
-
-        // // // extended functionality (3) [3, method, args...]
-        // // // THIS FUNCTION NEEDS TO BE IMPLEMENTED BY THE KEYBOARD, BECAUSE NOT ALL KEYBOARDS HAVE KNOBS, ETC.
-        // fn in_extended(&self, payload: &[u8]) -> &[u8] {
-        //     payload
-        // }
-
-        // OUTGOING FUNCTIONS
-        // single rgb (1) [1, key, r, g, b]
-        fn out_single_rgb(&self, key: u8, r: u8, g: u8, b: u8, device: &HidDevice) {
-            let buf = [0x1, 1, key, r, g, b];
-            device.write(&buf).unwrap();
-        }
-        // all rgb (2) [2, r, g, b]
-        fn out_all_rgb(&self, r: u8, g: u8, b: u8, device: &HidDevice) {
-            let buf = [0x1, 2, r, g, b];
-            device.write(&buf).unwrap();
-        }
-        // 4: high level key manipulation; key tap | [4, 0] taps keycode 0
-        fn out_tap_key(&self, key: u8, device: &HidDevice) {
-            let buf = [0x1, 4, key];
-            device.write(&buf).unwrap();
-        }
-        // 5: low level key manipulation; key register/unregister | [5, 1, 0] registers keycode 1. input registered until unregistered.
-        fn out_reg_key(&self, key: u8, down: bool, device: &HidDevice) {
-            let on = if down == true { 1 } else { 0 };
-            let buf = [0x1, 5, key, on];
-            device.write(&buf).unwrap();
-        }
-        // 6: intercept mode: will disable sending keypresses to the operating system, to be intercepted by this program; turn on/off | [6, 1] turns on intercept mode'
-        fn out_intercept_mode(&self, on: bool, device: &HidDevice) {
-            let on = if on == true { 1 } else { 0 };
-            let buf = [0x1, 6, on];
-            device.write(&buf).unwrap();
-        }
-
-        fn keeboard(&self) -> &Keeboard;
-    }
+   
+    
 
 }

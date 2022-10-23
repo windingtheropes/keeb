@@ -28,27 +28,18 @@ fn default_keymap() -> [Keys; 83] { [
    KC_LeftCtrl, KC_Menu, KC_LeftAlt,                 KC_Space,                            KC_RightAlt, KC_RollOver,   KC_RightCtrl,      KC_Left, KC_Down, KC_Right
 ]}
     
-    pub struct GmmkPro {
-        keeboard: Keeboard,
-    }
-
-    impl manager for GmmkPro {
-        fn keeboard(&self) -> &Keeboard {
-            &self.keeboard
-        }
-    }
-
     
-    pub fn gmmk_pro() -> GmmkPro {
-        return GmmkPro {
-            keeboard: Keeboard::new(
+    
+    pub fn gmmk_pro() -> Keeboard {
+        
+            Keeboard::new(
                 String::from("GMMK Pro"), 
                 83, 
                 0x5044, 
                 0x320F, 
                 &default_keymap()
             )
-        }
+        
     }
 
     #[allow(non_camel_case_types)]
