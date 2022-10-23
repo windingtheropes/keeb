@@ -1,5 +1,5 @@
 pub mod pro {
-    use keebLib::keeb::{Keys, manager, Keeboard, EnumInt, KeebLed, HidApi};
+    use keebLib::keeb::{Keys, Keeboard, EnumInt, KeebLed, HidApi};
     use keebLib::keeb::Keys::*;
     
     //    +--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+        +--------+

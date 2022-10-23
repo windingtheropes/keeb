@@ -31,6 +31,8 @@
 // 3: rotary encoder turned | [3, 1] the rotary encoder was turned clockwise
 // 4: force cancel | [4] || DEPRECATED
 pub mod keeb {
+    use std::sync::Arc;
+
     pub use hidapi::{HidApi, HidDevice};
     use strum::IntoEnumIterator; // 0.17.1
     pub use strum_macros::EnumIter;
@@ -424,6 +426,108 @@ pub mod keeb {
         }
         (255 as u32 + layer as u32) as u32
     }
+    
+
+    // the highest level part of keeb, to run the listener and hold API and DEVICE
+    pub struct Manager {
+        keeboard: Keeboard,
+        device: HidDevice,
+        api: HidApi,
+        intercept: bool,
+    }
+
+    impl Manager {
+        pub fn new(keeboard: Keeboard, api: HidApi) -> Manager {
+            let device = (|| {
+                for device in api.device_list() {
+                    if device.product_id() == keeboard.product_id && device.vendor_id() == keeboard.vendor_id && device.usage() == keeboard.usage && device.usage_page() == keeboard.usage_page
+                    {
+                        return device.open_device(&api).unwrap()
+                    }
+                }
+                panic!("Cannot find device");
+            })();
+            Manager {
+                keeboard, 
+                device,
+                api,
+                intercept: false
+            }
+        }
+        pub fn listen(&self) {
+                let device = &self.device;
+                let api = &self.api;
+                self.fw_intercept();
+                loop {
+                    // receiver configuration
+                    let mut buf = [0u8; 2];
+                    let res = device.read(&mut buf[..]).unwrap();
+                    // received data from the keyboard
+                    let payload = &buf[..res];
+        
+                    // read the payload
+                    println!("{:?}", payload);                                                          
+                    self.read_incoming(payload, api);
+                }
+        }
+        fn read_incoming(&self, payload: &[u8], api: &HidApi) {
+            // if self.intercept == true {
+                let method = payload[0];
+                match method {
+                    // 1: key pressed | [1, 45] key 45 was pressed down
+                    1 => {
+                        self.reg_key(payload[1])
+                    },
+                    // 2: key released | [2, 45] key 45 was released. this is the most common area to key key input.
+                    2 => {
+                        self.unreg_key(payload[1])
+                    },
+                    // 3: rotary encoder turned | [3, 1] the rotary encoder was turned clockwise
+                    3 => {
+                        if payload[1] == 1 {
+                            // clockwise
+                            self.tap_key(Keys::KC_KbVolumeUp as u8)
+                        }
+                        else {
+                            // counter clockwise
+                            self.tap_key(Keys::KC_KbVolumeDown as u8)
+                        }
+                    },
+                    _ => {}
+                }
+            // }
+            
+        }
+        fn reg_key(&self, key: u8) {
+            let buf = [0x1, 5, 0, key];
+            self.device.write(&buf).unwrap();
+        }
+        fn tap_key(&self, key: u8) {
+            self.reg_key(key);
+            self.unreg_key(key);
+        }
+        fn unreg_key(&self, key: u8) {
+            let buf = [0x1, 5, 1, key];
+            self.device.write(&buf).unwrap();
+        }
+        fn fw_intercept(&self) {
+            let on = if self.intercept == true { 1 } else { 0 };
+            let buf = [0x1, 6, on];
+            self.device.write(&buf).unwrap();
+        }
+        pub fn intercept(&mut self, on: bool) {
+            self.intercept = on;
+        }
+        pub fn api(&self) -> &HidApi {
+            &self.api
+        }
+        pub fn device(&self) -> &HidDevice {
+            &self.device
+        }
+    }
+
+
+    // keyboard information from creator
     #[derive(Debug, Clone)]
     pub struct Keeboard {
         pub name: String,
@@ -437,30 +541,6 @@ pub mod keeb {
         pub default_keymap: Vec<Keys>,
         // device: HidDevice
     }
-
-    pub struct Manager {
-        keeboard: Keeboard,
-        device: HidDevice
-    }
-
-    impl Manager {
-        fn new(keeboard: Keeboard, api: &HidApi) -> Manager {
-            let device = (|| {
-                for device in api.device_list() {
-                    if device.product_id() == keeboard.product_id && device.vendor_id() == keeboard.vendor_id && device.usage() == keeboard.usage && device.usage_page() == keeboard.usage_page
-                    {
-                        return device.open_device(api).unwrap()
-                    }
-                }
-                panic!("Cannot find device");
-            })();
-            Manager {
-                keeboard, 
-                device
-            }
-        }
-    }
-
     impl Keeboard {
         pub fn new(
             name: String,
@@ -485,22 +565,6 @@ pub mod keeb {
             }
         }
     }
-
-  
-
- 
-   
-        // loop {
-        //     // receiver configuration
-        //     let mut buf = [0u8; 2];
-        //     let res = device.read(&mut buf[..]).unwrap();
-        //     // received data from the keyboard
-        //     let payload = &buf[..res];
-
-        //     // read the payload
-        //     read_incoming(payload, api);
-        // }
-   
     
 
 }
