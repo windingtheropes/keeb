@@ -1,7 +1,7 @@
 pub mod pro {
-    use keebLib::codes::{Keys, EnumInt, KeebLed};
-    use keebLib::codes::Keys::*;
-
+    use keebLib::keeb::{Keys, manager, Keeboard, EnumInt, KeebLed, HidApi};
+    use keebLib::keeb::Keys::*;
+    
     //    +--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+        +--------+
 //    | Esc    | F1     | F2     | F3     | F4     | F5     | F6     | F7     | F8     | F9     | F10    | F11    | F12    | PrScr  |        | Mute   |
 //    +--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+        +--------+
@@ -19,24 +19,53 @@ pub mod pro {
 //    +--------+--------+--------+--------------------------------------------------------------+--------+--------+--------+--------+--------+--------+
 
 // key 78 is fn key
-    pub const fn default_keymap() -> [keebLib::codes::Keys; 83] {
-        [
-        KC_Escape,  KC_F1,  KC_F2,  KC_F3,  KC_F4,  KC_F5,  KC_F6,  KC_F7,  KC_F8,  KC_F9,  KC_F10,  KC_F11,  KC_F12,  KC_PrintScreen,                                   KC_AudioMute,
-        KC_Grave,   KC_Num1,KC_Num2,KC_Num3,KC_Num4,KC_Num5,KC_Num6,KC_Num7,KC_Num8,KC_Num9,KC_Num0, KC_Minus, KC_Equal,  KC_Backspace,                                  KC_Delete,
-        KC_Tab,     KC_Q,   KC_W,   KC_E,   KC_R,   KC_T,   KC_Y,   KC_U,   KC_I,   KC_O,   KC_P,    KC_LeftBracket, KC_RightBracket, KC_Backslash,                      KC_PageUp,
-        KC_CapsLock,KC_A,   KC_S,   KC_D,   KC_F,   KC_G,   KC_H,   KC_J,   KC_K,   KC_L,   KC_Semicolon, KC_Quote, KC_Enter,                                            KC_PageDown,
-        KC_LeftShift,       KC_Z,   KC_X,   KC_C,   KC_V,   KC_B,   KC_N,   KC_M,   KC_Comma, KC_Dot,  KC_Slash, KC_RightShift,                        KC_Up,            KC_End,
-       KC_LeftCtrl, KC_Menu, KC_LeftAlt,                 KC_Space,                            KC_RightAlt, KC_RollOver,   KC_RightCtrl,      KC_Left, KC_Down, KC_Right
-    ]
+fn default_keymap() -> [Keys; 83] { [
+    KC_Escape,  KC_F1,  KC_F2,  KC_F3,  KC_F4,  KC_F5,  KC_F6,  KC_F7,  KC_F8,  KC_F9,  KC_F10,  KC_F11,  KC_F12,  KC_PrintScreen,                                   KC_AudioMute,
+    KC_Grave,   KC_Num1,KC_Num2,KC_Num3,KC_Num4,KC_Num5,KC_Num6,KC_Num7,KC_Num8,KC_Num9,KC_Num0, KC_Minus, KC_Equal,  KC_Backspace,                                  KC_Delete,
+    KC_Tab,     KC_Q,   KC_W,   KC_E,   KC_R,   KC_T,   KC_Y,   KC_U,   KC_I,   KC_O,   KC_P,    KC_LeftBracket, KC_RightBracket, KC_Backslash,                      KC_PageUp,
+    KC_CapsLock,KC_A,   KC_S,   KC_D,   KC_F,   KC_G,   KC_H,   KC_J,   KC_K,   KC_L,   KC_Semicolon, KC_Quote, KC_Enter,                                            KC_PageDown,
+    KC_LeftShift,       KC_Z,   KC_X,   KC_C,   KC_V,   KC_B,   KC_N,   KC_M,   KC_Comma, KC_Dot,  KC_Slash, KC_RightShift,                        KC_Up,            KC_End,
+   KC_LeftCtrl, KC_Menu, KC_LeftAlt,                 KC_Space,                            KC_RightAlt, KC_RollOver,   KC_RightCtrl,      KC_Left, KC_Down, KC_Right
+]}
+    
+    pub struct GmmkPro {
+        keeboard: Keeboard,
     }
 
-    // Number of keys on the keyboard
-    pub const fn keycount() -> usize {
-        default_keymap().len()
+    impl manager for GmmkPro {
+        fn keeboard(&self) -> &Keeboard {
+            &self.keeboard
+        }
     }
+
+    pub fn gmmkPro() -> GmmkPro {
+        return GmmkPro {keeboard: Keeboard::new(String::from("GMMK Pro"), 83, 0x5044, 0x320F, &default_keymap())}
+    }
+    // pub const fn keyboard() -> kbd<'static> {
+    //     let name = "GMMK Pro";
+    //     let key_count: u8 = 83;
+    //     let vendor_id: u16 = 0x320F;
+    //     let product_id: u16 = 0x5044;
+    //     let usage_page: u16 = 0xFF60;
+    //     let usage: u16 = 0x61;
+
+    //     kbd {
+    //         name,
+    //         key_count,
+
+    //         product_id,
+    //         vendor_id,
+
+    //         usage_page,
+    //         usage,
+
+    //         default_keymap: vec![]
+    //     }
+    // }
 
     #[allow(non_camel_case_types)]
     #[derive(Clone, Copy)]
+
     // led naming based on the default layout of this keyboard.
     pub enum Leds {
         LED_Esc = 0,           //0,Esc,K13

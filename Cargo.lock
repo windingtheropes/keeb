@@ -47,6 +47,7 @@ dependencies = [
 name = "keebLib"
 version = "0.1.0"
 dependencies = [
+ "hidapi",
  "strum",
  "strum_macros",
 ]

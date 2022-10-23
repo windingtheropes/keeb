@@ -1,4 +1,37 @@
-pub mod codes {
+// Writing data to the device
+// ********
+// let buf = [0x1, 1, 0];
+// device.write(&buf).unwrap();
+// ********
+// the length of the payload must always be one more byte than the length of the actual desired readable payload, by preceeding it with a 0x1 byte
+// an example payload
+// [1, 1, 255, 255, 255]
+// [method, param, param, param, param, etc]
+// methods
+// 1: single rgb | [1, 45, 255, 255, 255] turns key 45 to white
+// 2: all rgb | [2, 255, 255, 255] turns the entire keyboard lighting to white
+// 3: side rgb | [3, 0, 255, 255, 255] 0 = left, 1 = right, this turns the left side to white || NOT IN USE
+// 4: high level key manipulation; key tap | [4, 0] taps keycode 0
+// 5: low level key manipulation; key register/unregister | [5, 1, 0] registers keycode 1. input registered until unregistered.
+// 6: intercept mode: will disable sending keypresses to the operating system, to be intercepted by this program; turn on/off | [6, 1] turns on intercept mode
+// 7: ping function | [7] reminds the keyboard that the program is still running || DEPRECATED
+
+// Reading data from the device
+// ********
+// let mut buf = [0u8; 2];
+// let res = device.read(&mut buf[..]).unwrap();
+// let payload = &buf[..res];
+// ********
+// payload structure is the same, except separated into types and data instead of methods
+// [1, 100]
+// [type, param]
+// types
+// 1: key pressed | [1, 45] key 45 was pressed down
+// 2: key released | [2, 45] key 45 was released. this is the most common area to key key input.
+// 3: rotary encoder turned | [3, 1] the rotary encoder was turned clockwise
+// 4: force cancel | [4] || DEPRECATED
+pub mod keeb {
+    pub use hidapi::{HidApi, HidDevice};
     use strum::IntoEnumIterator; // 0.17.1
     pub use strum_macros::EnumIter;
     // note:
@@ -318,7 +351,7 @@ pub mod codes {
             "3" => vec![Keys::KC_Num3 as u8],
             "4" => vec![Keys::KC_Num4 as u8],
             "5" => vec![Keys::KC_Num5 as u8],
-            "6" => vec![Keys::KC_Num6 as u8], 
+            "6" => vec![Keys::KC_Num6 as u8],
             "7" => vec![Keys::KC_Num7 as u8],
             "8" => vec![Keys::KC_Num8 as u8],
             "9" => vec![Keys::KC_Num9 as u8],
@@ -339,9 +372,9 @@ pub mod codes {
             "," => vec![Keys::KC_Comma as u8],
             "." => vec![Keys::KC_Dot as u8],
             "/" => vec![Keys::KC_Slash as u8],
-            "\'"=> vec![Keys::KC_Quote as u8],
+            "\'" => vec![Keys::KC_Quote as u8],
             ";" => vec![Keys::KC_Semicolon as u8],
-            "\\"=> vec![Keys::KC_Backslash as u8],
+            "\\" => vec![Keys::KC_Backslash as u8],
             "[" => vec![Keys::KC_LeftBracket as u8],
             "]" => vec![Keys::KC_RightBracket as u8],
             "=" => vec![Keys::KC_Equal as u8],
@@ -351,17 +384,11 @@ pub mod codes {
             "<" => vec![Keys::KC_LeftShift as u8, Keys::KC_Comma as u8],
             ">" => vec![Keys::KC_LeftShift as u8, Keys::KC_Dot as u8],
             "?" => vec![Keys::KC_LeftShift as u8, Keys::KC_Slash as u8],
-            "\""=> vec![Keys::KC_LeftShift as u8, Keys::KC_Quote as u8],
+            "\"" => vec![Keys::KC_LeftShift as u8, Keys::KC_Quote as u8],
             ":" => vec![Keys::KC_LeftShift as u8, Keys::KC_Semicolon as u8],
             "|" => vec![Keys::KC_LeftShift as u8, Keys::KC_Backslash as u8],
-            "{" => vec![
-                Keys::KC_LeftShift as u8,
-                Keys::KC_LeftBracket as u8,
-            ],
-            "}" => vec![
-                Keys::KC_LeftShift as u8,
-                Keys::KC_RightBracket as u8,
-            ],
+            "{" => vec![Keys::KC_LeftShift as u8, Keys::KC_LeftBracket as u8],
+            "}" => vec![Keys::KC_LeftShift as u8, Keys::KC_RightBracket as u8],
             "+" => vec![Keys::KC_LeftShift as u8, Keys::KC_Equal as u8],
             "_" => vec![Keys::KC_LeftShift as u8, Keys::KC_Minus as u8],
             // "*" => vec![KpAsterisk as u8],
@@ -371,7 +398,7 @@ pub mod codes {
         };
         res
     }
-    
+
     pub trait EnumInt {
         // as int
         fn i(&self) -> u32;
@@ -392,10 +419,155 @@ pub mod codes {
     }
 
     pub fn layer(layer: u32) -> u32 {
-        if layer < 1 || layer > 32 { panic!("Layer must be between 1 and 32"); }
+        if layer < 1 || layer > 32 {
+            panic!("Layer must be between 1 and 32");
+        }
         (255 as u32 + layer as u32) as u32
     }
-    pub enum extras {
-        ________ = 0x00,
+
+    pub struct Keeboard {
+        pub name: String,
+        pub key_count: u8,
+
+        pub product_id: u16,
+        pub vendor_id: u16,
+        pub usage_page: u16,
+        pub usage: u16,
+
+        pub default_keymap: Vec<Keys>,
+        // device: HidDevice
+    }
+
+    impl Keeboard {
+        // pub fn new(name: String, key_count: u8, product_id: u16, vendor_id: u16, default_keymap: &[Keys], api: &HidApi) -> Keeboard {
+        pub fn new(
+            name: String,
+            key_count: u8,
+            product_id: u16,
+            vendor_id: u16,
+            default_keymap: &[Keys],
+        ) -> Keeboard {
+            let usage_page = 0xFF60;
+            let usage = 0x61;
+            // let device = (|| {
+            //     for device in api.device_list() {
+            //         if device.product_id() == product_id && device.vendor_id() == vendor_id && device.usage() == usage && device.usage_page() == usage_page
+            //         {
+            //             return device.open_device(api).unwrap()
+            //         }
+            //     }
+            //     panic!("Cannot find device");
+            // })();
+
+            let default_keymap = default_keymap.to_vec();
+            Keeboard {
+                name,
+                key_count,
+
+                product_id,
+                vendor_id,
+                usage_page,
+                usage,
+
+                default_keymap,
+                // device
+            }
+        }
+        // pub fn device(&self) -> &HidDevice {
+        //     &self.device
+        // }
+    }
+
+    fn read_incoming(payload: &[u8], api: &HidApi) {
+        let method = payload[0];
+
+        match method {
+            1 => {
+                // key pressed
+                let key = payload[1];
+            }
+            2 => {
+                // key released
+                let key = payload[1];
+            }
+            3 => {
+                // extended functions
+                let clockwise = payload[1] == 1;
+            }
+            _ => {}
+        }
+    }
+
+    pub fn startListening(keyboard: &impl manager, api: &HidApi) {
+        let keeboard = keyboard.keeboard();
+        let device = (|| {
+            for device in api.device_list() {
+                if device.product_id() == keeboard.product_id
+                    && device.vendor_id() == keeboard.vendor_id
+                    && device.usage() == keeboard.usage
+                    && device.usage_page() == keeboard.usage_page
+                {
+                    return device.open_device(api).unwrap();
+                }
+            }
+            panic!("Cannot find device");
+        })();
+
+        loop {
+            // receiver configuration
+            let mut buf = [0u8; 2];
+            let res = device.read(&mut buf[..]).unwrap();
+            // received data from the keyboard
+            let payload = &buf[..res];
+
+            // read the payload
+            println!("{:?}", payload);
+            read_incoming(payload, api);
+        }
+    }
+    pub trait manager {
+        // INCOMING FUNCTIONS
+        // these incoming functions are basically worthless, might be removed soon. but for now are here for structure.
+        // // key down (1) [1, key]
+        // fn in_key_down(payload: &[u8]);
+
+        // // key up (2) [2, key]
+        // fn in_key_up(payload: &[u8]);
+
+        // // extended functionality (3) [3, method, args...]
+        // // THIS FUNCTION NEEDS TO BE IMPLEMENTED BY THE KEYBOARD, BECAUSE NOT ALL KEYBOARDS HAVE KNOBS, ETC.
+        // fn in_extended(payload: &[u8]);
+
+        // OUTGOING FUNCTIONS
+        // single rgb (1) [1, key, r, g, b]
+        fn out_single_rgb(key: u8, r: u8, g: u8, b: u8, device: &HidDevice) {
+            let buf = [0x1, 1, key, r, g, b];
+            device.write(&buf).unwrap();
+        }
+        // all rgb (2) [2, r, g, b]
+        fn out_all_rgb(r: u8, g: u8, b: u8, device: &HidDevice) {
+            let buf = [0x1, 2, r, g, b];
+            device.write(&buf).unwrap();
+        }
+        // 3: side rgb | [3, 0, 255, 255, 255] 0 = left, 1 = right, this turns the left side to white
+        // 4: high level key manipulation; key tap | [4, 0] taps keycode 0
+        fn out_tap_key(key: u8, device: &HidDevice) {
+            let buf = [0x1, 4, key];
+            device.write(&buf).unwrap();
+        }
+        // 5: low level key manipulation; key register/unregister | [5, 1, 0] registers keycode 1. input registered until unregistered.
+        fn out_reg_key(key: u8, down: bool, device: &HidDevice) {
+            let on = if down == true { 1 } else { 0 };
+            let buf = [0x1, 5, key, on];
+            device.write(&buf).unwrap();
+        }
+        // 6: intercept mode: will disable sending keypresses to the operating system, to be intercepted by this program; turn on/off | [6, 1] turns on intercept mode'
+        fn out_intercept_mode(on: bool, device: &HidDevice) {
+            let on = if on == true { 1 } else { 0 };
+            let buf = [0x1, 6, on];
+            device.write(&buf).unwrap();
+        }
+
+        fn keeboard(&self) -> &Keeboard;
     }
 }
