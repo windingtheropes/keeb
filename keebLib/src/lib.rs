@@ -477,18 +477,28 @@ pub mod keeb {
         //     &self.device
         // }
     }
+    fn keydu(key: u8, du: u8, device: &HidDevice) {
+        let buf = [0x1, 5, du, key];
+        device.write(&buf).unwrap();
+    }
 
-    fn read_incoming(payload: &[u8], api: &HidApi) {
+    fn read_incoming(payload: &[u8], device: &HidDevice) {
+        let keydu = |key: u8, du: u8| {
+            let buf = [0x1, 5, du, key];
+            device.write(&buf).unwrap();
+        };
         let method = payload[0];
 
         match method {
             1 => {
                 // key pressed
                 let key = payload[1];
+                keydu(key, 1);
             }
             2 => {
-                // key released
+                // key release
                 let key = payload[1];
+                keydu(key, 0);
             }
             3 => {
                 // extended functions
@@ -524,7 +534,7 @@ pub mod keeb {
             let payload = &buf[..res];
 
             // read the payload
-            read_incoming(payload, api);
+            read_incoming(payload, &device);
         }
     }
     pub trait manager {
