@@ -473,13 +473,6 @@ pub mod keeb {
                 // device
             }
         }
-        // pub fn device(&self) -> &HidDevice {
-        //     &self.device
-        // }
-    }
-    fn keydu(key: u8, du: u8, device: &HidDevice) {
-        let buf = [0x1, 5, du, key];
-        device.write(&buf).unwrap();
     }
 
     fn read_incoming(payload: &[u8], keyboard: &impl manager, device: &HidDevice) {
@@ -487,17 +480,15 @@ pub mod keeb {
         match method {
             1 => {
                 // key pressed
-                let key = payload[1];
-                keyboard.out_reg_key(key, true, device);
+                keyboard.on_key_down(payload, device);
             }
             2 => {
                 // key release
-                let key = payload[1];
-                keyboard.out_reg_key(key, false, device);
+                keyboard.on_key_up(payload, device);
             }
             3 => {
                 // extended functions
-                let clockwise = payload[1] == 1;
+                keyboard.on_extended(payload, device);
             }
             _ => {}
         }
@@ -520,7 +511,7 @@ pub mod keeb {
             }
             panic!("Cannot find device");
         })();
-        keyboard.out_intercept_mode(intercept, &device);
+        keyboard.intercept_mode(intercept, &device);
         loop {
             // receiver configuration
             let mut buf = [0u8; 2];
@@ -532,54 +523,47 @@ pub mod keeb {
             read_incoming(payload, keyboard, &device);
         }
     }
+
     pub trait manager {
         // INCOMING FUNCTIONS
-        // these incoming functions are basically worthless, might be removed soon. but for now are here for structure.
-        // // key down (1) [1, key]
-        // fn in_key_down(&self, payload: &[u8]) -> &[u8] {
-        //     payload
-        // }
-
-        // // // key up (2) [2, key]
-        // fn in_key_up(&self, payload: &[u8]) -> &[u8] {
-        //     payload
-        // }
-
-        // // // extended functionality (3) [3, method, args...]
-        // // // THIS FUNCTION NEEDS TO BE IMPLEMENTED BY THE KEYBOARD, BECAUSE NOT ALL KEYBOARDS HAVE KNOBS, ETC.
-        // fn in_extended(&self, payload: &[u8]) -> &[u8] {
-        //     payload
-        // }
-
+        // 1: key down [1, key]
+        fn on_key_down(&self, payload: &[u8], device: &HidDevice) {
+            
+        }
+        fn on_key_up(&self, payload: &[u8], device: &HidDevice) {
+            
+        }
+        fn on_extended(&self, payload: &[u8], device: &HidDevice) {
+            
+        }
         // OUTGOING FUNCTIONS
         // single rgb (1) [1, key, r, g, b]
-        fn out_single_rgb(&self, key: u8, r: u8, g: u8, b: u8, device: &HidDevice) {
+        fn set_key_rgb(&self, key: u8, r: u8, g: u8, b: u8, device: &HidDevice) {
             let buf = [0x1, 1, key, r, g, b];
             device.write(&buf).unwrap();
         }
         // all rgb (2) [2, r, g, b]
-        fn out_all_rgb(&self, r: u8, g: u8, b: u8, device: &HidDevice) {
+        fn set_all_rgb(&self, r: u8, g: u8, b: u8, device: &HidDevice) {
             let buf = [0x1, 2, r, g, b];
             device.write(&buf).unwrap();
         }
         // 4: high level key manipulation; key tap | [4, 0] taps keycode 0
-        fn out_tap_key(&self, key: u8, device: &HidDevice) {
+        fn tap_key(&self, key: u8, device: &HidDevice) {
             let buf = [0x1, 4, key];
             device.write(&buf).unwrap();
         }
         // 5: low level key manipulation; key register/unregister | [5, 1, 0] registers keycode 1. input registered until unregistered.
-        fn out_reg_key(&self, key: u8, down: bool, device: &HidDevice) {
+        fn reg_key(&self, key: u8, down: bool, device: &HidDevice) {
             let on = if down == true { 1 } else { 0 };
             let buf = [0x1, 5, on, key];
             device.write(&buf).unwrap();
         }
         // 6: intercept mode: will disable sending keypresses to the operating system, to be intercepted by this program; turn on/off | [6, 1] turns on intercept mode'
-        fn out_intercept_mode(&self, on: bool, device: &HidDevice) {
+        fn intercept_mode(&self, on: bool, device: &HidDevice) {
             let on = if on == true { 1 } else { 0 };
             let buf = [0x1, 6, on];
             device.write(&buf).unwrap();
         }
-
         fn keeboard(&self) -> &Keeboard;
     }
 

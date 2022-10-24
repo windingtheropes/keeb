@@ -1,5 +1,5 @@
 pub mod pro {
-    use keebLib::keeb::{Keys, manager, Keeboard, EnumInt, KeebLed, HidApi};
+    use keebLib::keeb::{Keys, manager, Keeboard, EnumInt, KeebLed, HidApi, HidDevice};
     use keebLib::keeb::Keys::*;
     
     //    +--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+        +--------+
@@ -33,11 +33,25 @@ fn default_keymap() -> [Keys; 83] { [
     }
 
     impl manager for GmmkPro {
+        fn on_key_down(&self, payload: &[u8], device: &HidDevice) {
+            self.reg_key(payload[1], true, device);
+        }
+        fn on_key_up(&self, payload: &[u8], device: &HidDevice) {
+            self.reg_key(payload[1], false, device);
+        }
+        fn on_extended(&self, payload: &[u8], device: &HidDevice) {
+            if payload[1] == 1
+            {
+                self.tap_key(Keys::KC_AudioVolUp as u8, device)
+            }
+            else {
+                self.tap_key(Keys::KC_AudioVolDown as u8, device)
+            }
+        }
         fn keeboard(&self) -> &Keeboard {
             &self.keeboard
         }
     }
-
     
     pub fn gmmk_pro() -> GmmkPro {
         return GmmkPro {
