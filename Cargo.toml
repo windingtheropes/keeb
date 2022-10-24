@@ -8,5 +8,5 @@ edition = "2021"
 hidapi = "1.2.5"
 strum = "0.24"
 strum_macros = "0.24"
-keebLib = {path = "./keebLib"}
+keeb_lib = {path = "./keeb_lib"}
 gmmk = {path = "./gmmk"}

@@ -1,6 +1,6 @@
 pub mod pro {
-    use keebLib::keeb::{Keys, manager, Keeboard, EnumInt, KeebLed, HidApi, HidDevice};
-    use keebLib::keeb::Keys::*;
+    use keeb_lib::keeb::{Keys, manager, Keeboard, EnumInt, KeebLed, HidApi, HidDevice};
+    use keeb_lib::keeb::Keys::*;
     
     //    +--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+        +--------+
 //    | Esc    | F1     | F2     | F3     | F4     | F5     | F6     | F7     | F8     | F9     | F10    | F11    | F12    | PrScr  |        | Mute   |
@@ -31,7 +31,7 @@ fn default_keymap() -> [Keys; 83] { [
     pub struct GmmkPro {
         keeboard: Keeboard,
     }
-
+    
     impl manager for GmmkPro {
         fn on_key_down(&self, payload: &[u8], device: &HidDevice) {
             self.reg_key(payload[1], true, device);
